@@ -5,9 +5,8 @@ import (
 )
 
 func TestInsertPaste(t *testing.T) {
-	readConfig()
 	pastaes = make(map[string]Pastae)
-	paste := "Trololoo"
+	paste := []byte("Trololoo")
 	id := insertPaste(paste, false)
 	data, ok := pastaes[id]
 	if !ok {
@@ -17,22 +16,21 @@ func TestInsertPaste(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != paste {
+	if fetched != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != paste {
+	if fetched != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 }
 
 func TestInsertPasteBurnAfterReading(t *testing.T) {
-	readConfig()
 	pastaes = make(map[string]Pastae)
-	paste := "Wololoo"
+	paste := []byte("Wololoo")
 	id := insertPaste(paste, true)
 	data, ok := pastaes[id]
 	if !ok {
@@ -42,7 +40,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != paste {
+	if fetched != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	data, ok = pastaes[id]
@@ -52,10 +50,9 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 }
 
 func TestLRUCache(t *testing.T) {
-	readConfig()
 	configuration.MaxEntries = 2
 	pastaes = make(map[string]Pastae)
-	paste := "Trololoo"
+	paste := []byte("Trololoo")
 	id1 := insertPaste(paste, false)
 	id2 := insertPaste(paste, false)
 	id3 := insertPaste(paste, false)
@@ -80,14 +77,14 @@ func TestLRUCache(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != paste {
+	if fetched != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != paste {
+	if fetched != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -19,10 +20,10 @@ type Configuration struct {
 	Addr string `json:"addr"`
 	//ReadTimeout    time.Duration
 	//WriteTimeout   time.Duration
-	MaxEntries     int  `json:"maxEntries"`
-	MaxEntrySize   int  `json:"maxEntrySize"`
-	MaxHeaderBytes int  `json:"maxHeaderBytes"`
-	TLS            bool `json:"tls"`
+	MaxEntries     int   `json:"maxEntries"`
+	MaxEntrySize   int64 `json:"maxEntrySize"`
+	MaxHeaderBytes int   `json:"maxHeaderBytes"`
+	TLS            bool  `json:"tls"`
 }
 
 type Pastae struct {
@@ -45,9 +46,9 @@ func main() {
 	readConfig()
 	pastaes = make(map[string]Pastae)
 	mux := httprouter.New()
-	mux.GET("/", serveRoot)
 	mux.GET("/paste/:id", servePaste)
 	mux.PUT("/paste/upload", uploadPaste)
+	mux.PUT("/paste/uploadBurning", uploadPasteBurning)
 	s := &http.Server{
 		Addr:    configuration.Addr,
 		Handler: mux,
@@ -69,14 +70,6 @@ func readConfig() {
 	json.Unmarshal(c, &configuration)
 }
 
-func serveRoot(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	fmt.Fprint(w, "Welcome to Pastae")
-}
-
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
 	data, ok := pastaes[id]
@@ -88,8 +81,9 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		} else {
 			fmt.Fprint(w, resp)
 		}
+	} else {
+		http.NotFound(w, r)
 	}
-	http.NotFound(w, r)
 }
 
 func fetchPaste(pasta Pastae) (string, error) {
@@ -116,10 +110,36 @@ func fetchPaste(pasta Pastae) (string, error) {
 }
 
 func uploadPaste(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, configuration.MaxEntrySize))
+	if err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	id := insertPaste(body, false)
+	if err := r.Body.Close(); err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(id))
 }
 
-func insertPaste(pasteData string, bar bool) string {
+func uploadPasteBurning(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, configuration.MaxEntrySize))
+	if err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	id := insertPaste(body, true)
+	if err := r.Body.Close(); err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(id))
+}
+
+func insertPaste(pasteData []byte, bar bool) string {
 	if len(pastaes) >= configuration.MaxEntries {
 		if firstPastae != nil {
 			pastaeMutex.Lock()
@@ -146,7 +166,7 @@ func insertPaste(pasteData string, bar bool) string {
 	}
 	paste.Nonce = nonce
 	paste.Key = key
-	payload, error := encrypt([]byte(pasteData), paste.Key, paste.Nonce)
+	payload, error := encrypt(pasteData, paste.Key, paste.Nonce)
 	if error != nil {
 		return "ERROR"
 	}
