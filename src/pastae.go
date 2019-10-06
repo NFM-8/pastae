@@ -42,15 +42,7 @@ var lastPastae *Pastae
 var pastaeMutex sync.Mutex
 
 func main() {
-	// Read config file
-	file, err := os.Open("pastae.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-	c, err := ioutil.ReadAll(file)
-	json.Unmarshal(c, &configuration)
-
+	readConfig()
 	pastaes = make(map[string]Pastae)
 	mux := httprouter.New()
 	mux.GET("/", serveRoot)
@@ -65,6 +57,16 @@ func main() {
 	}
 	log.Fatal(s.ListenAndServe())
 	return
+}
+
+func readConfig() {
+	file, err := os.Open("pastae.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	c, err := ioutil.ReadAll(file)
+	json.Unmarshal(c, &configuration)
 }
 
 func serveRoot(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -83,27 +85,34 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		if error != nil {
 			http.NotFound(w, r)
 			return
+		} else {
+			fmt.Fprint(w, resp)
 		}
-		fmt.Fprint(w, resp)
-		if data.BurnAfterReading {
-			pasta := pastaes[id]
-			pastaeMutex.Lock()
-			if pasta.Next != nil {
-				pasta.Next.Prev = pasta.Prev
-			} else {
-				lastPastae = pasta.Prev
-			}
-			if pasta.Prev != nil {
-				pasta.Prev.Next = pasta.Next
-			} else {
-				firstPastae = pasta.Next
-			}
-			delete(pastaes, id)
-			pastaeMutex.Unlock()
-		}
-		return
 	}
 	http.NotFound(w, r)
+}
+
+func fetchPaste(pasta Pastae) (string, error) {
+	resp, error := decryptPaste(pasta)
+	if error != nil {
+		return "ERROR", errors.New("Error fetching paste")
+	}
+	if pasta.BurnAfterReading {
+		pastaeMutex.Lock()
+		if pasta.Next != nil {
+			pasta.Next.Prev = pasta.Prev
+		} else {
+			lastPastae = pasta.Prev
+		}
+		if pasta.Prev != nil {
+			pasta.Prev.Next = pasta.Next
+		} else {
+			firstPastae = pasta.Next
+		}
+		delete(pastaes, pasta.Id)
+		pastaeMutex.Unlock()
+	}
+	return resp, nil
 }
 
 func uploadPaste(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -115,8 +124,13 @@ func insertPaste(pasteData string, bar bool) string {
 		if firstPastae != nil {
 			pastaeMutex.Lock()
 			delete(pastaes, firstPastae.Id)
-			firstPastae.Next.Prev = nil
-			firstPastae = firstPastae.Next
+			if firstPastae.Next != nil {
+				firstPastae.Next.Prev = nil
+				firstPastae = firstPastae.Next
+			} else {
+				firstPastae = nil
+				lastPastae = nil
+			}
 			pastaeMutex.Unlock()
 		}
 	}
@@ -144,6 +158,7 @@ func insertPaste(pasteData string, bar bool) string {
 	id := hex.EncodeToString(rnd)
 	paste.Next = nil
 	paste.Prev = nil
+	paste.Id = id
 	pastaeMutex.Lock()
 	pastaes[id] = paste
 	if lastPastae != nil {
@@ -158,7 +173,7 @@ func insertPaste(pasteData string, bar bool) string {
 	return id
 }
 
-func fetchPaste(paste Pastae) (string, error) {
+func decryptPaste(paste Pastae) (string, error) {
 	data, error := decrypt(paste.Payload, paste.Key, paste.Nonce)
 	if error != nil {
 		return "", errors.New("Error in decryption")

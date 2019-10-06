@@ -1,0 +1,8 @@
+{
+    "path": "/tmp/pastae",
+	"addr": ":8888",
+	"maxEntries": 4096,
+	"maxEntrySize": 8192,
+	"maxHeaderBytes": 1024,
+	"tls": false
+}
