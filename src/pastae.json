@@ -1,8 +1,10 @@
 {
-    "path": "/tmp/pastae",
-	"addr": ":8888",
+    "url": "https://paste.nerv.fi",
+	"listen": ":8888",
 	"maxEntries": 4096,
-	"maxEntrySize": 8192,
+	"maxEntrySize": 10485760,
 	"maxHeaderBytes": 1024,
-	"tls": false
+	"tls": false,
+	"tlsCert": "server.crt",
+	"tlsKey": "server.key"
 }

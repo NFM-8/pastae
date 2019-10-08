@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,18 +17,21 @@ import (
 )
 
 type Configuration struct {
-	Path string `json:"path"`
-	Addr string `json:"addr"`
+	URL    string `json:"url"`
+	Listen string `json:"listen"`
 	//ReadTimeout    time.Duration
 	//WriteTimeout   time.Duration
-	MaxEntries     int   `json:"maxEntries"`
-	MaxEntrySize   int64 `json:"maxEntrySize"`
-	MaxHeaderBytes int   `json:"maxHeaderBytes"`
-	TLS            bool  `json:"tls"`
+	MaxEntries     int    `json:"maxEntries"`
+	MaxEntrySize   int64  `json:"maxEntrySize"`
+	MaxHeaderBytes int    `json:"maxHeaderBytes"`
+	TLS            bool   `json:"tls"`
+	TLSCert        string `json:"tlsCert"`
+	TLSKey         string `json:"tlsKey"`
 }
 
 type Pastae struct {
 	Id               string
+	ContentType      string
 	BurnAfterReading bool
 	Key              []byte
 	Nonce            []byte
@@ -40,23 +44,29 @@ var configuration Configuration
 var pastaes map[string]Pastae
 var firstPastae *Pastae
 var lastPastae *Pastae
-var pastaeMutex sync.Mutex
+var pastaeMutex sync.RWMutex
 
 func main() {
 	readConfig()
 	pastaes = make(map[string]Pastae)
 	mux := httprouter.New()
-	mux.GET("/paste/:id", servePaste)
-	mux.PUT("/paste/upload", uploadPaste)
-	mux.PUT("/paste/uploadBurning", uploadPasteBurning)
+	mux.GET("/:id", servePaste)
+	mux.PUT("/upload", uploadPaste)
+	mux.PUT("/uploadBurning", uploadPasteBurning)
+	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
-		Addr:    configuration.Addr,
-		Handler: mux,
+		Addr:      configuration.Listen,
+		Handler:   mux,
+		TLSConfig: tlsConfig,
 		//ReadTimeout:    configuration.ReadTimeout,
 		//WriteTimeout:   configuration.WriteTimeout,
 		MaxHeaderBytes: configuration.MaxHeaderBytes,
 	}
-	log.Fatal(s.ListenAndServe())
+	if configuration.TLS {
+		log.Fatal(s.ListenAndServeTLS(configuration.TLSCert, configuration.TLSKey))
+	} else {
+		log.Fatal(s.ListenAndServe())
+	}
 	return
 }
 
@@ -68,17 +78,26 @@ func readConfig() {
 	defer file.Close()
 	c, err := ioutil.ReadAll(file)
 	json.Unmarshal(c, &configuration)
+	l := len(configuration.URL)
+	if l > 0 {
+		if configuration.URL[l-1] != '/' {
+			configuration.URL += "/"
+		}
+	}
 }
 
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
+	pastaeMutex.RLock()
 	data, ok := pastaes[id]
+	pastaeMutex.RUnlock()
 	if ok {
 		resp, error := fetchPaste(data)
 		if error != nil {
 			http.NotFound(w, r)
 			return
 		} else {
+			w.Header().Set("content-type", data.ContentType)
 			fmt.Fprint(w, resp)
 		}
 	} else {
@@ -115,7 +134,7 @@ func uploadPaste(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	id := insertPaste(body, false)
+	id := insertPaste(body, false, r.Header.Get("content-type"))
 	if err := r.Body.Close(); err != nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -130,7 +149,7 @@ func uploadPasteBurning(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	id := insertPaste(body, true)
+	id := insertPaste(body, true, r.Header.Get("content-type"))
 	if err := r.Body.Close(); err != nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -139,11 +158,11 @@ func uploadPasteBurning(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 	w.Write([]byte(id))
 }
 
-func insertPaste(pasteData []byte, bar bool) string {
+func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	if len(pastaes) >= configuration.MaxEntries {
 		if firstPastae != nil {
+			id := firstPastae.Id
 			pastaeMutex.Lock()
-			delete(pastaes, firstPastae.Id)
 			if firstPastae.Next != nil {
 				firstPastae.Next.Prev = nil
 				firstPastae = firstPastae.Next
@@ -151,6 +170,7 @@ func insertPaste(pasteData []byte, bar bool) string {
 				firstPastae = nil
 				lastPastae = nil
 			}
+			delete(pastaes, id)
 			pastaeMutex.Unlock()
 		}
 	}
@@ -164,6 +184,7 @@ func insertPaste(pasteData []byte, bar bool) string {
 	if error != nil {
 		return "ERROR"
 	}
+	paste.ContentType = contentType
 	paste.Nonce = nonce
 	paste.Key = key
 	payload, error := encrypt(pasteData, paste.Key, paste.Nonce)
@@ -190,7 +211,7 @@ func insertPaste(pasteData []byte, bar bool) string {
 		lastPastae = &paste
 	}
 	pastaeMutex.Unlock()
-	return id
+	return configuration.URL + id + "\n"
 }
 
 func decryptPaste(paste Pastae) (string, error) {

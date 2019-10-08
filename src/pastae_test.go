@@ -7,7 +7,8 @@ import (
 func TestInsertPaste(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Trololoo")
-	id := insertPaste(paste, false)
+	contentType := "daaddaaaa"
+	id := insertPaste(paste, false, contentType)
 	data, ok := pastaes[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
@@ -31,7 +32,8 @@ func TestInsertPaste(t *testing.T) {
 func TestInsertPasteBurnAfterReading(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Wololoo")
-	id := insertPaste(paste, true)
+	contentType := "daadda"
+	id := insertPaste(paste, true, contentType)
 	data, ok := pastaes[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
@@ -53,10 +55,11 @@ func TestLRUCache(t *testing.T) {
 	configuration.MaxEntries = 2
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Trololoo")
-	id1 := insertPaste(paste, false)
-	id2 := insertPaste(paste, false)
-	id3 := insertPaste(paste, false)
-	id4 := insertPaste(paste, false)
+	contentType := "dat"
+	id1 := insertPaste(paste, false, contentType)
+	id2 := insertPaste(paste, false, contentType)
+	id3 := insertPaste(paste, false, contentType)
+	id4 := insertPaste(paste, false, contentType)
 	data, ok := pastaes[id1]
 	if ok {
 		t.Errorf("Cache clearing failed")
