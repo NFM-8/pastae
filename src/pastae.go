@@ -211,7 +211,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 		lastPastae = &paste
 	}
 	pastaeMutex.Unlock()
-	return configuration.URL + id + "\n"
+	return configuration.URL + id
 }
 
 func decryptPaste(paste Pastae) (string, error) {
