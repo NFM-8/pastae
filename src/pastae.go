@@ -45,10 +45,17 @@ var pastaes map[string]Pastae
 var firstPastae *Pastae
 var lastPastae *Pastae
 var pastaeMutex sync.RWMutex
+var kek []byte
 
 func main() {
 	readConfig()
 	pastaes = make(map[string]Pastae)
+	kekT, error := generateRandomBytes(16)
+	if error != nil {
+		return
+	}
+	kek = kekT
+
 	mux := httprouter.New()
 	mux.GET("/:id", servePaste)
 	mux.PUT("/upload", uploadPaste)
@@ -187,7 +194,11 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	paste.ContentType = contentType
 	paste.Nonce = nonce
 	paste.Key = key
-	payload, error := encrypt(pasteData, paste.Key, paste.Nonce)
+	var ekey [16]byte
+	for i := 0; i < 16; i++ {
+		ekey[i] = paste.Key[i] ^ kek[i]
+	}
+	payload, error := encrypt(pasteData, ekey[0:16], paste.Nonce)
 	if error != nil {
 		return "ERROR"
 	}
@@ -215,7 +226,11 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 }
 
 func decryptPaste(paste Pastae) (string, error) {
-	data, error := decrypt(paste.Payload, paste.Key, paste.Nonce)
+	var key [16]byte
+	for i := 0; i < 16; i++ {
+		key[i] = paste.Key[i] ^ kek[i]
+	}
+	data, error := decrypt(paste.Payload, key[0:16], paste.Nonce)
 	if error != nil {
 		return "", errors.New("Error in decryption")
 	}

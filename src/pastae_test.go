@@ -8,6 +8,11 @@ func TestInsertPaste(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Trololoo")
 	contentType := "daaddaaaa"
+	kekT, error := generateRandomBytes(16)
+	if error != nil {
+		return
+	}
+	kek = kekT
 	id := insertPaste(paste, false, contentType)
 	data, ok := pastaes[id]
 	if !ok {
@@ -33,6 +38,11 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Wololoo")
 	contentType := "daadda"
+	kekT, error := generateRandomBytes(16)
+	if error != nil {
+		return
+	}
+	kek = kekT
 	id := insertPaste(paste, true, contentType)
 	data, ok := pastaes[id]
 	if !ok {
@@ -56,6 +66,11 @@ func TestLRUCache(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Trololoo")
 	contentType := "dat"
+	kekT, error := generateRandomBytes(16)
+	if error != nil {
+		return
+	}
+	kek = kekT
 	id1 := insertPaste(paste, false, contentType)
 	id2 := insertPaste(paste, false, contentType)
 	id3 := insertPaste(paste, false, contentType)
