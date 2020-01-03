@@ -4,6 +4,8 @@
 	"maxEntries": 4096,
 	"maxEntrySize": 10485760,
 	"maxHeaderBytes": 1024,
+	"readTimeout": 10,
+	"writeTimeout": 10,
 	"tls": false,
 	"tlsCert": "server.crt",
 	"tlsKey": "server.key"

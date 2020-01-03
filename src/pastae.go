@@ -13,21 +13,22 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 )
 
 type Configuration struct {
-	URL    string `json:"url"`
-	Listen string `json:"listen"`
-	//ReadTimeout    time.Duration
-	//WriteTimeout   time.Duration
-	MaxEntries     int    `json:"maxEntries"`
-	MaxEntrySize   int64  `json:"maxEntrySize"`
-	MaxHeaderBytes int    `json:"maxHeaderBytes"`
-	TLS            bool   `json:"tls"`
-	TLSCert        string `json:"tlsCert"`
-	TLSKey         string `json:"tlsKey"`
+	URL            string        `json:"url"`
+	Listen         string        `json:"listen"`
+	ReadTimeout    time.Duration `json:"readTimeout"`
+	WriteTimeout   time.Duration `json:"writeTimeout"`
+	MaxEntries     int           `json:"maxEntries"`
+	MaxEntrySize   int64         `json:"maxEntrySize"`
+	MaxHeaderBytes int           `json:"maxHeaderBytes"`
+	TLS            bool          `json:"tls"`
+	TLSCert        string        `json:"tlsCert"`
+	TLSKey         string        `json:"tlsKey"`
 }
 
 type Pastae struct {
@@ -63,11 +64,11 @@ func main() {
 	mux.PUT("/uploadBurning", uploadPasteBurning)
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
-		Addr:      configuration.Listen,
-		Handler:   mux,
-		TLSConfig: tlsConfig,
-		//ReadTimeout:    configuration.ReadTimeout,
-		//WriteTimeout:   configuration.WriteTimeout,
+		Addr:           configuration.Listen,
+		Handler:        mux,
+		TLSConfig:      tlsConfig,
+		ReadTimeout:    configuration.ReadTimeout * time.Second,
+		WriteTimeout:   configuration.WriteTimeout * time.Second,
 		MaxHeaderBytes: configuration.MaxHeaderBytes,
 	}
 	if configuration.TLS {

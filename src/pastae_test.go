@@ -4,67 +4,10 @@ import (
 	"testing"
 )
 
-func TestInsertPaste(t *testing.T) {
-	pastaes = make(map[string]Pastae)
-	paste := []byte("Trololoo")
-	contentType := "daaddaaaa"
-	kekT, error := generateRandomBytes(16)
-	if error != nil {
-		return
-	}
-	kek = kekT
-	id := insertPaste(paste, false, contentType)
-	data, ok := pastaes[id]
-	if !ok {
-		t.Errorf("Map lookup failed")
-	}
-	fetched, error := fetchPaste(data)
-	if error != nil {
-		t.Errorf("fetchPaste failed")
-	}
-	if fetched != string(paste) {
-		t.Errorf("Fetched paste is corrupted")
-	}
-	fetched, error = fetchPaste(data)
-	if error != nil {
-		t.Errorf("fetchPaste failed")
-	}
-	if fetched != string(paste) {
-		t.Errorf("Fetched paste is corrupted")
-	}
-}
-
-func TestInsertPasteBurnAfterReading(t *testing.T) {
-	pastaes = make(map[string]Pastae)
-	paste := []byte("Wololoo")
-	contentType := "daadda"
-	kekT, error := generateRandomBytes(16)
-	if error != nil {
-		return
-	}
-	kek = kekT
-	id := insertPaste(paste, true, contentType)
-	data, ok := pastaes[id]
-	if !ok {
-		t.Errorf("Map lookup failed")
-	}
-	fetched, error := fetchPaste(data)
-	if error != nil {
-		t.Errorf("fetchPaste failed")
-	}
-	if fetched != string(paste) {
-		t.Errorf("Fetched paste is corrupted")
-	}
-	data, ok = pastaes[id]
-	if ok {
-		t.Errorf("Paste not burned after fetching")
-	}
-}
-
 func TestLRUCache(t *testing.T) {
 	configuration.MaxEntries = 2
 	pastaes = make(map[string]Pastae)
-	paste := []byte("Trololoo")
+	paste := []byte("Trololooloti")
 	contentType := "dat"
 	kekT, error := generateRandomBytes(16)
 	if error != nil {
@@ -104,5 +47,76 @@ func TestLRUCache(t *testing.T) {
 	}
 	if fetched != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
+	}
+}
+
+func TestInsertPaste(t *testing.T) {
+	pastaes = make(map[string]Pastae)
+	paste := []byte("Trololoo")
+	contentType := "daaddaaaa"
+	kekT, error := generateRandomBytes(16)
+	if error != nil {
+		return
+	}
+	kek = kekT
+	id := insertPaste(paste, false, contentType)
+	data, ok := pastaes[id]
+	if !ok {
+		t.Errorf("Map lookup failed")
+	}
+	fetched, error := fetchPaste(data)
+	if error != nil {
+		t.Errorf("fetchPaste failed")
+	}
+	if fetched != string(paste) {
+		t.Errorf("Fetched paste is corrupted")
+	}
+	fetched, error = fetchPaste(data)
+	if error != nil {
+		t.Errorf("fetchPaste failed")
+	}
+	if fetched != string(paste) {
+		t.Errorf("Fetched paste is corrupted")
+	}
+}
+
+func TestInsertPastaes(t *testing.T) {
+	for i := 0; i < 5000; i++ {
+		TestInsertPaste(t)
+		TestInsertPasteBurnAfterReading(t)
+	}
+}
+
+func TestInsertPasteBurnAfterReading(t *testing.T) {
+	pastaes = make(map[string]Pastae)
+	paste := []byte("Wololo")
+	contentType := "daadda"
+	kekT, error := generateRandomBytes(16)
+	if error != nil {
+		return
+	}
+	kek = kekT
+	id := insertPaste(paste, true, contentType)
+	data, ok := pastaes[id]
+	if !ok {
+		t.Errorf("Map lookup failed")
+	}
+	fetched, error := fetchPaste(data)
+	if error != nil {
+		t.Errorf("fetchPaste failed")
+	}
+	if fetched != string(paste) {
+		t.Errorf("Fetched paste is corrupted")
+	}
+	data, ok = pastaes[id]
+	if ok {
+		t.Errorf("Paste not burned after fetching")
+	}
+}
+
+func TestInsertPastaesBurnAfterReading(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		TestInsertPasteBurnAfterReading(t)
+		TestInsertPaste(t)
 	}
 }
