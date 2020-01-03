@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha512"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -194,13 +195,20 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	paste.ContentType = contentType
 	paste.Nonce = nonce
 	paste.Key = key
-	var ekey [16]byte
+	var ekey [32]byte
 	for i := 0; i < 16; i++ {
-		ekey[i] = paste.Key[i] ^ kek[i]
+		ekey[i] = paste.Key[i]
 	}
-	payload, error := encrypt(pasteData, ekey[0:16], paste.Nonce)
+	for i := 16; i < 32; i++ {
+		ekey[i] = kek[i-16]
+	}
+	sum := sha512.Sum512(ekey[0:32])
+	payload, error := encrypt(pasteData, sum[0:16], paste.Nonce)
 	if error != nil {
 		return "ERROR"
+	}
+	for i := 0; i < 32; i++ {
+		sum[i] = 0
 	}
 	paste.Payload = payload
 	rnd, error := generateRandomBytes(12)
@@ -226,13 +234,20 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 }
 
 func decryptPaste(paste Pastae) (string, error) {
-	var key [16]byte
+	var key [32]byte
 	for i := 0; i < 16; i++ {
-		key[i] = paste.Key[i] ^ kek[i]
+		key[i] = paste.Key[i]
 	}
-	data, error := decrypt(paste.Payload, key[0:16], paste.Nonce)
+	for i := 16; i < 32; i++ {
+		key[i] = kek[i-16]
+	}
+	sum := sha512.Sum512(key[0:32])
+	data, error := decrypt(paste.Payload, sum[0:16], paste.Nonce)
 	if error != nil {
 		return "", errors.New("Error in decryption")
+	}
+	for i := 0; i < 32; i++ {
+		sum[i] = 0
 	}
 	return string(data), nil
 }
