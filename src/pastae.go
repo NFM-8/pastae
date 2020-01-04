@@ -59,7 +59,7 @@ func main() {
 
 	mux := httprouter.New()
 	mux.GET("/:id", servePaste)
-	mux.PUT("/upload", uploadPaste)
+	mux.POST("/upload", uploadPaste)
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
 		Addr:           configuration.Listen,

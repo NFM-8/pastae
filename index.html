@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Pastae</title>
+<meta charset="utf-8">
+
+<style>
+.flex-container {
+  display: flex;
+  justify-content: center;
+}
+.footer {
+  padding: 10px;
+  text-align: center;
+}
+.button {
+  background-color: #e7e7e7;
+  border: none;
+  color: black;
+  padding: 15px 32px;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+}
+textarea {
+  width: 100%;
+  height: 150px;
+  padding: 12px 20px;
+  box-sizing: border-box;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f8f8;
+}
+fieldset {
+  border: 2px solid #ccc;
+  border-radius: 4px;
+}
+p.sansserif {
+  font-family: Arial, Helvetica, sans-serif;
+}
+legend.sansserif {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 1.875em;
+}
+</style>
+</head>
+<body>
+<div class="flex-container">
+<div>
+<form action="/upload" id="paste" method="post" enctype="multipart/form-data">
+  <fieldset>
+    <legend class="sansserif">Upload paste</legend>
+    <textarea form="paste" name="data" autocomplete="off" rows="15" cols="80" required></textarea>
+    <input type="hidden" name="content-type" value="text/plain">
+    <p class="sansserif">
+        <label>
+          <input type="checkbox" name="bar" value="bar">
+          Burn after reading
+        </label>
+    </p>
+    <p><button class="button">Submit</button></p>
+  </fieldset>
+</form>
+</div>
+
+<div>
+<form action="/upload" id="upload" method="post" enctype="multipart/form-data">
+    <fieldset>
+      <legend class="sansserif">Upload image</legend>
+      <input type="file" name="file" class="button" required>
+      <p class="sansserif">
+        <label>Format</label><br>
+        <label>
+          <input type="radio" name="content-type" value="image/jpeg">
+          jpeg
+        </label>
+        <label>
+          <input type="radio" name="content-type" value="image/png">
+          png
+        </label>
+      </p>
+      <p class="sansserif">
+          <label>
+            <input type="checkbox" name="bar" value="bar">
+            Burn after reading
+          </label>
+      </p>
+      <p><button class="button">Submit</button></p>
+    </fieldset>
+  </form>
+</div>
+</div>
+<div class="footer">
+    <p class="sansserif">Powered by <a href="https://github.com/NFM-8/pastae">pastae</a></p>
+</div>
+</body>
+</html>
