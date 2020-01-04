@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -61,7 +60,6 @@ func main() {
 	mux := httprouter.New()
 	mux.GET("/:id", servePaste)
 	mux.PUT("/upload", uploadPaste)
-	mux.PUT("/uploadBurning", uploadPasteBurning)
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
 		Addr:           configuration.Listen,
@@ -107,17 +105,20 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			return
 		} else {
 			w.Header().Set("content-type", data.ContentType)
-			fmt.Fprint(w, resp)
+			w.Write(resp)
+			for i := 0; i < len(resp); i++ {
+				resp[i] = 0
+			}
 		}
 	} else {
 		http.NotFound(w, r)
 	}
 }
 
-func fetchPaste(pasta Pastae) (string, error) {
+func fetchPaste(pasta Pastae) ([]byte, error) {
 	resp, error := decryptPaste(pasta)
 	if error != nil {
-		return "ERROR", errors.New("Error fetching paste")
+		return []byte("ERROR"), errors.New("Error fetching paste")
 	}
 	if pasta.BurnAfterReading {
 		pastaeMutex.Lock()
@@ -138,33 +139,45 @@ func fetchPaste(pasta Pastae) (string, error) {
 }
 
 func uploadPaste(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, configuration.MaxEntrySize))
+	err := r.ParseMultipartForm(configuration.MaxEntrySize + 4096)
 	if err != nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	id := insertPaste(body, false, r.Header.Get("content-type"))
-	if err := r.Body.Close(); err != nil {
-		w.WriteHeader(http.StatusNoContent)
+	contentType := r.FormValue("content-type")
+	bar := r.FormValue("bar") == "bar"
+	if contentType == "text/plain" {
+		id := insertPaste([]byte(r.FormValue("data")), bar, contentType)
+		if err := r.Body.Close(); err != nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(id))
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(id))
-}
-
-func uploadPasteBurning(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, configuration.MaxEntrySize))
-	if err != nil {
-		w.WriteHeader(http.StatusNoContent)
+	if contentType == "image/jpeg" || contentType == "image/png" {
+		file, header, err := r.FormFile("file")
+		if err != nil || header.Size > configuration.MaxEntrySize {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		data, err := ioutil.ReadAll(io.LimitReader(file, configuration.MaxEntrySize))
+		if err != nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		id := insertPaste(data, bar, contentType)
+		if err := r.Body.Close(); err != nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(id))
 		return
 	}
-	id := insertPaste(body, true, r.Header.Get("content-type"))
-	if err := r.Body.Close(); err != nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(id))
+	w.WriteHeader(http.StatusNoContent)
+	return
 }
 
 func insertPaste(pasteData []byte, bar bool, contentType string) string {
@@ -234,7 +247,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	return configuration.URL + id
 }
 
-func decryptPaste(paste Pastae) (string, error) {
+func decryptPaste(paste Pastae) ([]byte, error) {
 	var key [32]byte
 	for i := 0; i < 16; i++ {
 		key[i] = paste.Key[i]
@@ -245,10 +258,10 @@ func decryptPaste(paste Pastae) (string, error) {
 	sum := sha512.Sum512(key[0:32])
 	data, error := decrypt(paste.Payload, sum[0:16], paste.Nonce)
 	if error != nil {
-		return "", errors.New("Error in decryption")
+		return []byte(""), errors.New("Error in decryption")
 	}
 	for i := 0; i < 32; i++ {
 		sum[i] = 0
 	}
-	return string(data), nil
+	return data, nil
 }

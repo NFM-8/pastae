@@ -38,14 +38,14 @@ func TestLRUCache(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != string(paste) {
+	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != string(paste) {
+	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 }
@@ -68,14 +68,14 @@ func TestInsertPaste(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != string(paste) {
+	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != string(paste) {
+	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 }
@@ -105,7 +105,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if fetched != string(paste) {
+	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	data, ok = pastaes[id]
