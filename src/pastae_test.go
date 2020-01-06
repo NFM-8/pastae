@@ -125,11 +125,11 @@ func TestInsertPastaesBurnAfterReading(t *testing.T) {
 func TestSessionCleaning(t *testing.T) {
 	sessions = make(map[string]Session)
 	var session Session
-	session.UserID = []byte("öriöriöri")
+	session.UserID = 765
 	session.Created = time.Now().Unix() - 100500100500
 	sessions["expired"] = session
 	var session2 Session
-	session2.UserID = []byte("öriöriöri")
+	session2.UserID = 3124
 	session2.Created = time.Now().Unix() + 100500100500
 	sessions["valid"] = session2
 	cleanSessions()
@@ -140,5 +140,20 @@ func TestSessionCleaning(t *testing.T) {
 	_, ok = sessions["valid"]
 	if !ok {
 		t.Errorf("Valid session cleaned")
+	}
+}
+
+func TestSessionValidation(t *testing.T) {
+	var session Session
+	session.UserID = 100500
+	session.Created = time.Now().Unix()
+	sessions["sess"] = session
+	id := sessionValid("sess")
+	if id < 0 {
+		t.Errorf("Valid session deemed invalid")
+	}
+	id = sessionValid("invalid")
+	if id >= 0 {
+		t.Errorf("Invalid session deemed valid")
 	}
 }

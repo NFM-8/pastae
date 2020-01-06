@@ -17,17 +17,23 @@ import (
 )
 
 type Configuration struct {
-	URL            string        `json:"url"`
-	Listen         string        `json:"listen"`
-	FrontPage      string        `json:"frontPage"`
-	ReadTimeout    time.Duration `json:"readTimeout"`
-	WriteTimeout   time.Duration `json:"writeTimeout"`
-	MaxEntries     int           `json:"maxEntries"`
-	MaxEntrySize   int64         `json:"maxEntrySize"`
-	MaxHeaderBytes int           `json:"maxHeaderBytes"`
-	TLS            bool          `json:"tls"`
-	TLSCert        string        `json:"tlsCert"`
-	TLSKey         string        `json:"tlsKey"`
+	URL                 string        `json:"url"`
+	Listen              string        `json:"listen"`
+	FrontPage           string        `json:"frontPage"`
+	ReadTimeout         time.Duration `json:"readTimeout"`
+	WriteTimeout        time.Duration `json:"writeTimeout"`
+	MaxEntries          int           `json:"maxEntries"`
+	MaxEntrySize        int64         `json:"maxEntrySize"`
+	MaxHeaderBytes      int           `json:"maxHeaderBytes"`
+	TLS                 bool          `json:"tls"`
+	TLSCert             string        `json:"tlsCert"`
+	TLSKey              string        `json:"tlsKey"`
+	Session             bool          `json:"session"`
+	SessionTimeout      int64         `json:"sessionTimeout"`
+	SessionPath         string        `json:"sessionPath"`
+	SessionMaxEntries   int64         `json:"sessionMaxEntries"`
+	SessionMaxEntrySize int64         `json:"sessionMaxEntrySize"`
+	SessionConnStr      string        `json:"sessionConnStr"`
 }
 
 type Pastae struct {
@@ -42,7 +48,7 @@ type Pastae struct {
 }
 
 type Session struct {
-	UserID  []byte
+	UserID  int64
 	Kek     []byte
 	Created int64
 }
@@ -66,7 +72,10 @@ func main() {
 	}
 	kek = kekT
 
-	sessions = make(map[string]Session)
+	if configuration.Session {
+		sessions = make(map[string]Session)
+		go sessionCleaner(time.Minute)
+	}
 
 	mux := httprouter.New()
 	mux.GET("/", serveFrontPage)
@@ -81,7 +90,6 @@ func main() {
 		WriteTimeout:   configuration.WriteTimeout * time.Second,
 		MaxHeaderBytes: configuration.MaxHeaderBytes,
 	}
-	go sessionCleaner(time.Minute)
 	if configuration.TLS {
 		log.Fatal(s.ListenAndServeTLS(configuration.TLSCert, configuration.TLSKey))
 	} else {
@@ -297,7 +305,7 @@ func cleanSessions() {
 	var expired []string
 	sessionMutex.RLock()
 	for k, v := range sessions {
-		if t-v.Created >= 2*60*60 {
+		if t-v.Created >= configuration.SessionTimeout {
 			expired = append(expired, k)
 		}
 	}
@@ -307,4 +315,15 @@ func cleanSessions() {
 		delete(sessions, k)
 	}
 	sessionMutex.Unlock()
+}
+
+func sessionValid(token string) (id int64) {
+	sessionMutex.RLock()
+	ses, ok := sessions[token]
+	if !ok {
+		sessionMutex.RUnlock()
+		return -100
+	}
+	sessionMutex.RUnlock()
+	return ses.UserID
 }

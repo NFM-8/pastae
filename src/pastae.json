@@ -2,12 +2,18 @@
     "url": "http://pastae",
 	"listen": ":8888",
 	"frontPage": "index.html",
-	"maxEntries": 4096,
+	"maxEntries": 10,
 	"maxEntrySize": 10485760,
 	"maxHeaderBytes": 1024,
 	"readTimeout": 10,
 	"writeTimeout": 10,
 	"tls": false,
 	"tlsCert": "server.crt",
-	"tlsKey": "server.key"
+	"tlsKey": "server.key",
+	"session": false,
+	"sessionTimeout": 36000,
+	"sessionPath": "/tmp/pastae",
+	"sessionMaxEntries": 1000,
+	"sessionMaxEntrySize": 10485760,
+	"sessionConnStr": "host=%s port=%d user=%s password=%s dbname=%s sslmode=disable"
 }
