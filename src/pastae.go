@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -61,7 +60,7 @@ var frontPage []byte
 func main() {
 	readConfig()
 	pastaes = make(map[string]Pastae)
-	kekT, error := generateRandomBytes(16)
+	kekT, error := generateRandomBytes(1024)
 	if error != nil {
 		return
 	}
@@ -92,11 +91,10 @@ func main() {
 }
 
 func readConfig() {
-	file, err := os.Open("pastae.json")
+	c, err := ioutil.ReadFile("pastae.json")
 	if err != nil {
 		log.Fatal(err)
 	}
-	c, err := ioutil.ReadAll(file)
 	json.Unmarshal(c, &configuration)
 	l := len(configuration.URL)
 	if l > 0 {
@@ -104,13 +102,10 @@ func readConfig() {
 			configuration.URL += "/"
 		}
 	}
-	file.Close()
-	file, err = os.Open(configuration.FrontPage)
+	frontPage, err = ioutil.ReadFile(configuration.FrontPage)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
-	frontPage, err = ioutil.ReadAll(file)
 }
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
