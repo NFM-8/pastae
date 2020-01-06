@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 func TestLRUCache(t *testing.T) {
@@ -118,5 +119,26 @@ func TestInsertPastaesBurnAfterReading(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		TestInsertPasteBurnAfterReading(t)
 		TestInsertPaste(t)
+	}
+}
+
+func TestSessionCleaning(t *testing.T) {
+	sessions = make(map[string]Session)
+	var session Session
+	session.UserID = []byte("öriöriöri")
+	session.Created = time.Now().Unix() - 100500100500
+	sessions["expired"] = session
+	var session2 Session
+	session2.UserID = []byte("öriöriöri")
+	session2.Created = time.Now().Unix() + 100500100500
+	sessions["valid"] = session2
+	cleanSessions()
+	_, ok := sessions["expired"]
+	if ok {
+		t.Errorf("Expired session not cleaned")
+	}
+	_, ok = sessions["valid"]
+	if !ok {
+		t.Errorf("Valid session cleaned")
 	}
 }

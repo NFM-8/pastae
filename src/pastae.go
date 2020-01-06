@@ -42,11 +42,19 @@ type Pastae struct {
 	Prev             *Pastae
 }
 
+type Session struct {
+	UserID  []byte
+	Kek     []byte
+	Created int64
+}
+
 var configuration Configuration
 var pastaes map[string]Pastae
 var firstPastae *Pastae
 var lastPastae *Pastae
 var pastaeMutex sync.RWMutex
+var sessionMutex sync.RWMutex
+var sessions map[string]Session
 var kek []byte
 var frontPage []byte
 
@@ -58,6 +66,8 @@ func main() {
 		return
 	}
 	kek = kekT
+
+	sessions = make(map[string]Session)
 
 	mux := httprouter.New()
 	mux.GET("/", serveFrontPage)
@@ -72,6 +82,7 @@ func main() {
 		WriteTimeout:   configuration.WriteTimeout * time.Second,
 		MaxHeaderBytes: configuration.MaxHeaderBytes,
 	}
+	go sessionCleaner(time.Minute)
 	if configuration.TLS {
 		log.Fatal(s.ListenAndServeTLS(configuration.TLSCert, configuration.TLSKey))
 	} else {
@@ -277,4 +288,28 @@ func decryptPaste(paste Pastae) ([]byte, error) {
 		sum[i] = 0
 	}
 	return data, nil
+}
+
+func sessionCleaner(sleepTime time.Duration) {
+	for {
+		time.Sleep(sleepTime)
+		cleanSessions()
+	}
+}
+
+func cleanSessions() {
+	t := time.Now().Unix()
+	var expired []string
+	sessionMutex.RLock()
+	for k, v := range sessions {
+		if t-v.Created >= 2*60*60 {
+			expired = append(expired, k)
+		}
+	}
+	sessionMutex.RUnlock()
+	sessionMutex.Lock()
+	for _, k := range expired {
+		delete(sessions, k)
+	}
+	sessionMutex.Unlock()
 }
