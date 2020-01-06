@@ -1,6 +1,7 @@
 {
-    "url": "https://paste.nerv.fi",
+    "url": "http://pastae",
 	"listen": ":8888",
+	"frontPage": "index.html",
 	"maxEntries": 4096,
 	"maxEntrySize": 10485760,
 	"maxHeaderBytes": 1024,

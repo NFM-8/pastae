@@ -20,6 +20,7 @@ import (
 type Configuration struct {
 	URL            string        `json:"url"`
 	Listen         string        `json:"listen"`
+	FrontPage      string        `json:"frontPage"`
 	ReadTimeout    time.Duration `json:"readTimeout"`
 	WriteTimeout   time.Duration `json:"writeTimeout"`
 	MaxEntries     int           `json:"maxEntries"`
@@ -47,6 +48,7 @@ var firstPastae *Pastae
 var lastPastae *Pastae
 var pastaeMutex sync.RWMutex
 var kek []byte
+var frontPage []byte
 
 func main() {
 	readConfig()
@@ -58,6 +60,7 @@ func main() {
 	kek = kekT
 
 	mux := httprouter.New()
+	mux.GET("/", serveFrontPage)
 	mux.GET("/:id", servePaste)
 	mux.POST("/upload", uploadPaste)
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
@@ -82,7 +85,6 @@ func readConfig() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
 	c, err := ioutil.ReadAll(file)
 	json.Unmarshal(c, &configuration)
 	l := len(configuration.URL)
@@ -91,6 +93,17 @@ func readConfig() {
 			configuration.URL += "/"
 		}
 	}
+	file.Close()
+	file, err = os.Open(configuration.FrontPage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	frontPage, err = ioutil.ReadAll(file)
+}
+
+func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	w.Write(frontPage)
 }
 
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
