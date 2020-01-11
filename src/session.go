@@ -35,10 +35,9 @@ func cleanSessions() {
 func sessionValid(token string) (id int64) {
 	sessionMutex.RLock()
 	ses, ok := sessions[token]
+	sessionMutex.RUnlock()
 	if !ok {
-		sessionMutex.RUnlock()
 		return -100
 	}
-	sessionMutex.RUnlock()
 	return ses.UserID
 }

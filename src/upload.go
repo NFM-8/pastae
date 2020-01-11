@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -81,22 +82,11 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	paste.ContentType = contentType
 	paste.Nonce = nonce
 	paste.Key = key
-	var ekey [32]byte
-	for i := 0; i < 16; i++ {
-		ekey[i] = paste.Key[i]
-	}
-	for i := 16; i < 32; i++ {
-		ekey[i] = kek[i-16]
-	}
-	sum := sha512.Sum512(ekey[0:32])
-	payload, error := encrypt(pasteData, sum[0:16], paste.Nonce)
+	pasteData, error = encryptData(pasteData, key, nonce)
 	if error != nil {
 		return "ERROR"
 	}
-	for i := 0; i < 32; i++ {
-		sum[i] = 0
-	}
-	paste.Payload = payload
+	paste.Payload = pasteData
 	rnd, error := generateRandomBytes(12)
 	if error != nil {
 		return "ERROR"
@@ -117,4 +107,27 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	}
 	pastaeMutex.Unlock()
 	return configuration.URL + id
+}
+
+func encryptData(payload []byte, key []byte, nonce []byte) ([]byte, error) {
+	var ekey [32]byte
+	for i := 0; i < 16; i++ {
+		ekey[i] = key[i]
+	}
+	for i := 16; i < 32; i++ {
+		ekey[i] = kek[i-16]
+	}
+	sum := sha512.Sum512(ekey[0:32])
+	var error error
+	payload, error = encrypt(payload, sum[0:16], nonce)
+	if error != nil {
+		for i := 0; i < 32; i++ {
+			sum[i] = 0
+		}
+		return nil, errors.New("ERROR")
+	}
+	for i := 0; i < 32; i++ {
+		sum[i] = 0
+	}
+	return payload, nil
 }

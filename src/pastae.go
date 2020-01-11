@@ -2,14 +2,17 @@ package main
 
 import (
 	"crypto/tls"
+	"database/sql"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
+	_ "github.com/lib/pq"
 )
 
 type Configuration struct {
@@ -52,17 +55,32 @@ var sessionMutex sync.RWMutex
 var sessions map[string]Session
 var kek []byte
 var frontPage []byte
+var db *sql.DB
 
 func main() {
 	readConfig()
 	pastaes = make(map[string]Pastae)
 	kekT, error := generateRandomBytes(1024)
 	if error != nil {
-		return
+		panic(error)
 	}
 	kek = kekT
 
 	if configuration.Session {
+		if _, err := os.Stat(configuration.SessionPath); os.IsNotExist(err) {
+			log.Fatal("SessionPath does not exist")
+		}
+		tdb, err := sql.Open("postgres", configuration.SessionConnStr)
+		defer tdb.Close()
+		if err != nil {
+			panic(err)
+		}
+		err = tdb.Ping()
+		if err != nil {
+			panic(err)
+		}
+		db = tdb
+		createDbTablesAndIndexes()
 		sessions = make(map[string]Session)
 		go sessionCleaner(time.Minute)
 	}
@@ -108,4 +126,37 @@ func readConfig() {
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	w.Write(frontPage)
+}
+
+func createDbTablesAndIndexes() {
+	_, err := db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS users (" +
+		"id BIGINT PRIMARY KEY," +
+		"hash BYTEA NOT NULL," +
+		"kek BYTEA NOT NULL)")
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS data (" +
+		"id BIGINT PRIMARY KEY," +
+		"uid BIGINT NOT NULL," +
+		"pid VARCHAR NOT NULL," +
+		"fname VARCHAR NOT NULL," +
+		"key BYTEA NOT NULL," +
+		"nonce BYTEA NOT NULL," +
+		"expire BIGINT)")
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_uid ON data USING hash (uid)")
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS data_pid ON data USING btree (pid)")
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_expire ON data USING btree (expire)")
+	if err != nil {
+		panic(err)
+	}
 }
