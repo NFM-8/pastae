@@ -1,8 +1,9 @@
 package main
 
 import (
-	"crypto/sha512"
 	"errors"
+	"io/ioutil"
+	"log"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -30,6 +31,62 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 }
 
+func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	id := p.ByName("id")
+	pastaeMutex.RLock()
+	data, ok := pastaes[id]
+	pastaeMutex.RUnlock()
+	if ok {
+		resp, error := fetchPaste(data)
+		if error != nil {
+			http.NotFound(w, r)
+			return
+		} else {
+			w.Header().Set("content-type", data.ContentType)
+			w.Write(resp)
+			go zeroByteArray(resp, len(resp))
+		}
+	} else {
+		var fname string
+		var key []byte
+		var nonce []byte
+		var uid int64
+		var contentType string
+		error := db.QueryRow("SELECT fname,key,nonce,uid,ct FROM data "+
+			"WHERE pid=$1", id).Scan(&fname, &key, &nonce, &uid, &contentType)
+		if error != nil {
+			log.Println(error)
+			http.NotFound(w, r)
+			return
+		}
+		var ukek []byte
+		error = db.QueryRow("SELECT kek FROM users WHERE id=$1", uid).Scan(&ukek)
+		if error != nil {
+			log.Println(error)
+			http.NotFound(w, r)
+			return
+		}
+		var file []byte
+		file, error = ioutil.ReadFile(configuration.SessionPath + fname)
+		if error != nil {
+			log.Println(error)
+			http.NotFound(w, r)
+			return
+		}
+		sum := kdf(key, ukek)
+		file, error = decrypt(file, sum[0:16], nonce)
+		go zeroByteArray(sum, 32)
+		if error != nil {
+			log.Println(error)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("content-type", contentType)
+		w.Write(file)
+		go zeroByteArray(file, len(file))
+	}
+}
+
 func fetchPaste(pasta Pastae) ([]byte, error) {
 	resp, error := decryptPaste(pasta)
 	if error != nil {
@@ -54,20 +111,11 @@ func fetchPaste(pasta Pastae) ([]byte, error) {
 }
 
 func decryptPaste(paste Pastae) ([]byte, error) {
-	var key [32]byte
-	for i := 0; i < 16; i++ {
-		key[i] = paste.Key[i]
-	}
-	for i := 16; i < 32; i++ {
-		key[i] = kek[i-16]
-	}
-	sum := sha512.Sum512(key[0:32])
+	sum := kdf(paste.Key, kek)
 	data, error := decrypt(paste.Payload, sum[0:16], paste.Nonce)
 	if error != nil {
-		return []byte(""), errors.New("Error in decryption")
+		return []byte(""), error
 	}
-	for i := 0; i < 32; i++ {
-		sum[i] = 0
-	}
+	go zeroByteArray(sum, 32)
 	return data, nil
 }

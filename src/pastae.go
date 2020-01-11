@@ -66,9 +66,10 @@ func main() {
 	}
 	kek = kekT
 
+	pasteServer := servePaste
 	if configuration.Session {
 		if _, err := os.Stat(configuration.SessionPath); os.IsNotExist(err) {
-			log.Fatal("SessionPath does not exist")
+			log.Fatal("SessionPath (" + configuration.SessionPath + ") does not exist")
 		}
 		tdb, err := sql.Open("postgres", configuration.SessionConnStr)
 		defer tdb.Close()
@@ -83,12 +84,29 @@ func main() {
 		createDbTablesAndIndexes()
 		sessions = make(map[string]Session)
 		go sessionCleaner(time.Minute)
+		pasteServer = servePasteS
+		l := len(configuration.SessionPath)
+		if l > 0 {
+			if configuration.SessionPath[l-1] != '/' {
+				configuration.SessionPath += "/"
+			}
+		}
+
+		// JOOJOOJOO
+		var testSession Session
+		testSession.Created = time.Now().Unix() + 100500100500
+		testSession.Kek = []byte("kekekekekeRuusperi")
+		testSession.UserID = int64(1)
+		sessions["wolo"] = testSession
 	}
 
 	mux := httprouter.New()
 	mux.GET("/", serveFrontPage)
-	mux.GET("/:id", servePaste)
+	mux.GET("/:id", pasteServer)
 	mux.POST("/upload", uploadPaste)
+	if configuration.Session {
+		mux.POST("/uploadS", uploadPasteS)
+	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
 		Addr:           configuration.Listen,
@@ -130,19 +148,20 @@ func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 
 func createDbTablesAndIndexes() {
 	_, err := db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS users (" +
-		"id BIGINT PRIMARY KEY," +
-		"hash BYTEA NOT NULL," +
+		"id BIGSERIAL PRIMARY KEY," +
+		"hash BYTEA NOT NULL UNIQUE," +
 		"kek BYTEA NOT NULL)")
 	if err != nil {
 		panic(err)
 	}
 	_, err = db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS data (" +
-		"id BIGINT PRIMARY KEY," +
+		"id BIGSERIAL PRIMARY KEY," +
 		"uid BIGINT NOT NULL," +
 		"pid VARCHAR NOT NULL," +
 		"fname VARCHAR NOT NULL," +
 		"key BYTEA NOT NULL," +
 		"nonce BYTEA NOT NULL," +
+		"ct VARCHAR NOT NULL," +
 		"expire BIGINT)")
 	if err != nil {
 		panic(err)
