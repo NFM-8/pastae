@@ -19,8 +19,8 @@ func encrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
 		return []byte("err"), errors.New("Error in encryption")
 	}
 
-	ciphertext := aesgcm.Seal(nil, nonce, []byte(data), nil)
-	return ciphertext, nil
+	data = aesgcm.Seal(nil, nonce, []byte(data), nil)
+	return data, nil
 }
 
 func decrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
@@ -34,11 +34,11 @@ func decrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
 		return []byte("err"), errors.New("Error in decryption")
 	}
 
-	plaintext, err := aesgcm.Open(nil, nonce, data, nil)
+	data, err = aesgcm.Open(nil, nonce, data, nil)
 	if err != nil {
 		return []byte("err"), errors.New("Error in decryption")
 	}
-	return plaintext, nil
+	return data, nil
 }
 
 func generateRandomBytes(num int) ([]byte, error) {
