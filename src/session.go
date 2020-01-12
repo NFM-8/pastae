@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -89,13 +90,13 @@ func sessionValid(token string) int64 {
 
 func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var hash []byte
-	hash, err := ioutil.ReadAll(r.Body)
+	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
 	defer r.Body.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if registerUser(string(hash)) == "OK" {
+	if registerUser(hash) == "OK" {
 		w.Write([]byte("OK"))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -103,7 +104,7 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	}
 }
 
-func registerUser(hash string) string {
+func registerUser(hash []byte) string {
 	kek, err := generateRandomBytes(64)
 	if err != nil {
 		log.Println(err)
@@ -119,7 +120,7 @@ func registerUser(hash string) string {
 
 func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var hash []byte
-	hash, err := ioutil.ReadAll(r.Body)
+	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
 	defer r.Body.Close()
 	if err != nil {
 		log.Println(err)
@@ -144,4 +145,27 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	sessions[sid] = sess
 	sessionMutex.Unlock()
 	w.Write([]byte(sid))
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	var hash []byte
+	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
+	defer r.Body.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	go func(hash []byte) {
+		sessionMutex.RLock()
+		sessid := sessionValid(string(hash))
+		sessionMutex.RUnlock()
+		if sessid < 0 {
+			return
+		}
+		sessionMutex.Lock()
+		delete(sessions, string(hash))
+		sessionMutex.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}(hash)
 }

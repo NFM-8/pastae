@@ -108,6 +108,7 @@ func main() {
 		mux.POST("/uploadS", uploadPasteS)
 		mux.POST("/register", registerUserHandler)
 		mux.POST("/login", loginHandler)
+		mux.POST("/logout", logoutHandler)
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
@@ -151,7 +152,7 @@ func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 func createDbTablesAndIndexes() {
 	_, err := db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS users (" +
 		"id BIGSERIAL PRIMARY KEY," +
-		"hash VARCHAR NOT NULL UNIQUE," +
+		"hash BYTEA NOT NULL UNIQUE," +
 		"kek BYTEA NOT NULL)")
 	if err != nil {
 		panic(err)
