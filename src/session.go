@@ -166,6 +166,5 @@ func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		sessionMutex.Lock()
 		delete(sessions, string(hash))
 		sessionMutex.Unlock()
-		w.WriteHeader(http.StatusOK)
 	}(hash)
 }
