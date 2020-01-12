@@ -148,11 +148,11 @@ func TestSessionValidation(t *testing.T) {
 	session.UserID = 100500
 	session.Created = time.Now().Unix()
 	sessions["sess"] = session
-	id := sessionValid("sess")
+	id, _ := sessionValid("sess")
 	if id < 0 {
 		t.Errorf("Valid session deemed invalid")
 	}
-	id = sessionValid("invalid")
+	id, _ = sessionValid("invalid")
 	if id >= 0 {
 		t.Errorf("Invalid session deemed valid")
 	}

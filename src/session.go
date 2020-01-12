@@ -78,14 +78,14 @@ func cleanExpired() {
 	}
 }
 
-func sessionValid(token string) int64 {
+func sessionValid(token string) (int64, []byte) {
 	sessionMutex.RLock()
 	ses, ok := sessions[token]
 	sessionMutex.RUnlock()
 	if !ok {
-		return -100
+		return -100, []byte("ERR")
 	}
-	return ses.UserID
+	return ses.UserID, ses.Kek
 }
 
 func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -158,7 +158,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 	w.WriteHeader(http.StatusOK)
 	go func(hash []byte) {
 		sessionMutex.RLock()
-		sessid := sessionValid(string(hash))
+		sessid, _ := sessionValid(string(hash))
 		sessionMutex.RUnlock()
 		if sessid < 0 {
 			return

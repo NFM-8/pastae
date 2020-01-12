@@ -37,8 +37,9 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	}
 	var uid int64 = 0
 	var expire int64 = 0
+	var ukek []byte
 	if session {
-		uid = sessionValid(r.Header.Get("pastae-sessid"))
+		uid, ukek = sessionValid(r.Header.Get("pastae-sessid"))
 		if uid < 0 {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -70,7 +71,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	if contentType == "text/plain" {
 		var id string
 		if session {
-			id = insertPasteToFile([]byte(r.FormValue("data")), bar, contentType, uid, expire)
+			id = insertPasteToFile([]byte(r.FormValue("data")), bar, contentType, uid, expire, ukek)
 			sessionPasteCountMutex.Lock()
 			sessionPasteCount++
 			sessionPasteCountMutex.Unlock()
@@ -100,7 +101,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		}
 		var id string
 		if session {
-			id = insertPasteToFile(data, bar, contentType, uid, expire)
+			id = insertPasteToFile(data, bar, contentType, uid, expire, ukek)
 			sessionPasteCountMutex.Lock()
 			sessionPasteCount++
 			sessionPasteCountMutex.Unlock()
@@ -178,7 +179,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 }
 
 func insertPasteToFile(pasteData []byte, bar bool,
-	contentType string, uid int64, expire int64) string {
+	contentType string, uid int64, expire int64, ukek []byte) string {
 	rnd, error := generateRandomBytes(12)
 	if error != nil {
 		return "ERROR"
@@ -194,11 +195,6 @@ func insertPasteToFile(pasteData []byte, bar bool,
 		return "ERROR"
 	}
 	key, error := generateRandomBytes(16)
-	if error != nil {
-		return "ERROR"
-	}
-	var ukek []byte
-	error = db.QueryRow("SELECT kek FROM users WHERE id=$1", uid).Scan(&ukek)
 	if error != nil {
 		return "ERROR"
 	}
@@ -248,6 +244,27 @@ func insertPasteToFile(pasteData []byte, bar bool,
 		return "ERROR"
 	}
 	return id
+}
+
+func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	uid, _ := sessionValid(r.Header.Get("pastae-sessid"))
+	if uid < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	go func(pid string) {
+		var fname string
+		err := db.QueryRow("DELETE FROM data WHERE pid = $1 RETURNING fname", pid).Scan(&fname)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		err = os.Remove(configuration.SessionPath + fname)
+		if err != nil {
+			log.Println(err)
+		}
+	}(p.ByName("id"))
 }
 
 func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, error) {

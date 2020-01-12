@@ -109,6 +109,7 @@ func main() {
 		mux.POST("/register", registerUserHandler)
 		mux.POST("/login", loginHandler)
 		mux.POST("/logout", logoutHandler)
+		mux.DELETE("/:id", deleteHandler)
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
