@@ -264,6 +264,9 @@ func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		if err != nil {
 			log.Println(err)
 		}
+		sessionPasteCountMutex.Lock()
+		sessionPasteCount--
+		sessionPasteCountMutex.Unlock()
 	}(p.ByName("id"))
 }
 
