@@ -53,6 +53,8 @@ var lastPastae *Pastae
 var pastaeMutex sync.RWMutex
 var sessionMutex sync.RWMutex
 var sessions map[string]Session
+var sessionPasteCount int64
+var sessionPasteCountMutex sync.RWMutex
 var kek []byte
 var frontPage []byte
 var db *sql.DB
@@ -62,7 +64,7 @@ func main() {
 	pastaes = make(map[string]Pastae)
 	kekT, error := generateRandomBytes(1024)
 	if error != nil {
-		panic(error)
+		log.Fatal(error)
 	}
 	kek = kekT
 
@@ -74,16 +76,17 @@ func main() {
 		tdb, err := sql.Open("postgres", configuration.SessionConnStr)
 		defer tdb.Close()
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		err = tdb.Ping()
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		db = tdb
 		createDbTablesAndIndexes()
 		sessions = make(map[string]Session)
 		go sessionCleaner(time.Minute)
+		go expiredCleaner(time.Minute)
 		pasteServer = servePasteS
 		l := len(configuration.SessionPath)
 		if l > 0 {
@@ -91,13 +94,10 @@ func main() {
 				configuration.SessionPath += "/"
 			}
 		}
-
-		// JOOJOOJOO
-		var testSession Session
-		testSession.Created = time.Now().Unix() + 100500100500
-		testSession.Kek = []byte("kekekekekeRuusperi")
-		testSession.UserID = int64(1)
-		sessions["wolo"] = testSession
+		err = db.QueryRow("SELECT COUNT(id) FROM data").Scan(&sessionPasteCount)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	mux := httprouter.New()
@@ -106,6 +106,8 @@ func main() {
 	mux.POST("/upload", uploadPaste)
 	if configuration.Session {
 		mux.POST("/uploadS", uploadPasteS)
+		mux.POST("/register", registerUserHandler)
+		mux.POST("/login", loginHandler)
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
@@ -149,7 +151,7 @@ func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 func createDbTablesAndIndexes() {
 	_, err := db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS users (" +
 		"id BIGSERIAL PRIMARY KEY," +
-		"hash BYTEA NOT NULL UNIQUE," +
+		"hash VARCHAR NOT NULL UNIQUE," +
 		"kek BYTEA NOT NULL)")
 	if err != nil {
 		panic(err)

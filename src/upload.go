@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -39,11 +40,29 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	if session {
 		uid = sessionValid(r.Header.Get("pastae-sessid"))
 		if uid < 0 {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		if r.FormValue("expire") == "30" {
 			expire = time.Now().Unix() + 30*24*60*60
+		}
+		var pcount int64
+		sessionPasteCountMutex.RLock()
+		pcount = sessionPasteCount
+		sessionPasteCountMutex.RUnlock()
+		if pcount >= configuration.SessionMaxEntries {
+			go func() {
+				var fname string
+				err = db.QueryRow("DELETE FROM data WHERE id =" +
+					"(SELECT id FROM data ORDER BY id LIMIT 1) RETURNING fname").Scan(&fname)
+				if err != nil {
+					log.Println(err)
+				}
+				err = os.Remove(configuration.SessionPath + fname)
+				if err != nil {
+					log.Println(err)
+				}
+			}()
 		}
 	}
 	contentType := r.FormValue("content-type")
@@ -52,6 +71,9 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		var id string
 		if session {
 			id = insertPasteToFile([]byte(r.FormValue("data")), bar, contentType, uid, expire)
+			sessionPasteCountMutex.Lock()
+			sessionPasteCount++
+			sessionPasteCountMutex.Unlock()
 		} else {
 			id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
 		}
@@ -79,6 +101,9 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		var id string
 		if session {
 			id = insertPasteToFile(data, bar, contentType, uid, expire)
+			sessionPasteCountMutex.Lock()
+			sessionPasteCount++
+			sessionPasteCountMutex.Unlock()
 		} else {
 			id = insertPaste(data, bar, contentType)
 		}
@@ -175,8 +200,6 @@ func insertPasteToFile(pasteData []byte, bar bool,
 	var ukek []byte
 	error = db.QueryRow("SELECT kek FROM users WHERE id=$1", uid).Scan(&ukek)
 	if error != nil {
-		log.Println("uid: " + string(uid))
-		log.Println(error)
 		return "ERROR"
 	}
 	var dbStatus string
