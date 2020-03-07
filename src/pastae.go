@@ -10,6 +10,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq"
@@ -44,6 +45,12 @@ type Pastae struct {
 	Payload          []byte
 	Next             *Pastae
 	Prev             *Pastae
+}
+
+type PastaeListing struct {
+	Id          string
+	Expire      int64
+	ContentType string
 }
 
 var configuration Configuration
@@ -105,10 +112,12 @@ func main() {
 	mux.GET("/:id", pasteServer)
 	mux.POST("/upload", uploadPaste)
 	if configuration.Session {
+		mux.GET("/list", pasteList)
 		mux.POST("/uploadS", uploadPasteS)
 		mux.POST("/register", registerUserHandler)
 		mux.POST("/login", loginHandler)
 		mux.POST("/logout", logoutHandler)
+		mux.POST("/:id/expiry/:days", expiry)
 		mux.DELETE("/:id", deleteHandler)
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
@@ -133,7 +142,10 @@ func readConfig() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	json.Unmarshal(c, &configuration)
+	err = json.Unmarshal(c, &configuration)
+	if err != nil {
+		log.Fatal(err)
+	}
 	l := len(configuration.URL)
 	if l > 0 {
 		if configuration.URL[l-1] != '/' {
@@ -148,6 +160,60 @@ func readConfig() {
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	w.Write(frontPage)
+}
+
+func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	uid, _ := sessionValid(r.Header.Get("pastae-sessid"))
+	if uid < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	res, err := db.Query("SELECT pid,expire,ct FROM data WHERE uid = $1",uid)
+	defer res.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	var resp []PastaeListing
+	for res.Next() {
+		var elem PastaeListing
+		var expireUnix int64
+		err = res.Scan(&elem.Id, &expireUnix, &elem.ContentType)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		elem.Expire = expireUnix / (60*60*24)
+		resp = append(resp, elem)
+	}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.Write(bytes)
+}
+
+func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	uid, _ := sessionValid(r.Header.Get("pastae-sessid"))
+	if uid < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id := p.ByName("id")
+	days, err := strconv.ParseInt(p.ByName("days"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	t := time.Now().Unix() + days*60*60*24
+	_, err = db.Exec("UPDATE data SET expire = $1 WHERE pid = $2 AND COUNT(SELECT * FROM users WHERE id = $3) = 1", t, id, uid)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func createDbTablesAndIndexes() {
