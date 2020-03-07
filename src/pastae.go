@@ -208,7 +208,7 @@ func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	t := time.Now().Unix() + days*60*60*24
-	_, err = db.Exec("UPDATE data SET expire = $1 WHERE pid = $2 AND COUNT(SELECT * FROM users WHERE id = $3) = 1", t, id, uid)
+	_, err = db.Exec("UPDATE data SET expire = $1 WHERE pid = $2 AND uid = $3", t, id, uid)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
