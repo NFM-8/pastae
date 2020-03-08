@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
+	"image"
 	"io"
 	"io/ioutil"
 	"log"
@@ -10,6 +12,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	_ "image/jpeg"
+	_ "image/png"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -87,38 +92,41 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		w.Write([]byte(id))
 		return
 	}
-	if contentType == "image/jpeg" || contentType == "image/png" {
-		file, header, err := r.FormFile("file")
-		if err != nil || header.Size > maxEntrySize {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		data, err := ioutil.ReadAll(io.LimitReader(file, maxEntrySize))
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			log.Println("Reading file")
-			return
-		}
-		var id string
-		if session {
-			id = insertPasteToFile(data, bar, contentType, uid, expire, ukek)
-			sessionPasteCountMutex.Lock()
-			sessionPasteCount++
-			sessionPasteCountMutex.Unlock()
-		} else {
-			id = insertPaste(data, bar, contentType)
-		}
-		if err := r.Body.Close(); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			log.Println("Body close")
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(id))
+	file, header, err := r.FormFile("file")
+	var format string
+	if err != nil || header.Size > maxEntrySize {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusBadRequest)
-	log.Println("General")
+	data, err := ioutil.ReadAll(io.LimitReader(file, maxEntrySize))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Println("Reading file")
+		return
+	}
+	_, format, err = image.Decode(bytes.NewReader(data))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+	contentType = "image/" + format
+	var id string
+	if session {
+		id = insertPasteToFile(data, bar, contentType, uid, expire, ukek)
+		sessionPasteCountMutex.Lock()
+		sessionPasteCount++
+		sessionPasteCountMutex.Unlock()
+	} else {
+		id = insertPaste(data, bar, contentType)
+	}
+	if err := r.Body.Close(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Println("Body close")
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(id))
 	return
 }
 

@@ -19,12 +19,11 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		if error != nil {
 			http.NotFound(w, r)
 			return
-		} else {
-			w.Header().Set("content-type", data.ContentType)
-			w.Write(resp)
-			for i := 0; i < len(resp); i++ {
-				resp[i] = 0
-			}
+		}
+		w.Header().Set("content-type", data.ContentType)
+		w.Write(resp)
+		for i := 0; i < len(resp); i++ {
+			resp[i] = 0
 		}
 	} else {
 		http.NotFound(w, r)
@@ -41,11 +40,10 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		if error != nil {
 			http.NotFound(w, r)
 			return
-		} else {
-			w.Header().Set("content-type", data.ContentType)
-			w.Write(resp)
-			go zeroByteArray(resp, len(resp))
 		}
+		w.Header().Set("content-type", data.ContentType)
+		w.Write(resp)
+		go zeroByteArray(resp, len(resp))
 	} else {
 		var fname string
 		var key []byte

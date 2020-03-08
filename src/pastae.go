@@ -8,9 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq"
@@ -168,7 +168,7 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	res, err := db.Query("SELECT pid,expire,ct FROM data WHERE uid = $1",uid)
+	res, err := db.Query("SELECT pid,expire,ct FROM data WHERE uid = $1", uid)
 	defer res.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -183,7 +183,7 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			log.Println(err)
 			continue
 		}
-		elem.Expire = expireUnix / (60*60*24)
+		elem.Expire = expireUnix / (60 * 60 * 24)
 		resp = append(resp, elem)
 	}
 	bytes, err := json.Marshal(resp)
