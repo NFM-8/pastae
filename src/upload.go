@@ -10,11 +10,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+
+	_ "golang.org/x/image/webp"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -169,6 +173,8 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 		return "ERROR"
 	}
 	id := hex.EncodeToString(rnd)
+	ct := strings.Split(contentType, "/")
+	id += "." + ct[1]
 	paste.Next = nil
 	paste.Prev = nil
 	paste.Id = id
@@ -193,6 +199,8 @@ func insertPasteToFile(pasteData []byte, bar bool,
 		return "ERROR"
 	}
 	id := hex.EncodeToString(rnd)
+	ct := strings.Split(contentType, "/")
+	id += "." + ct[1]
 	rnd, error = generateRandomBytes(12)
 	if error != nil {
 		return "ERROR"

@@ -9,7 +9,7 @@ func TestLRUCache(t *testing.T) {
 	configuration.MaxEntries = 2
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Trololooloti")
-	contentType := "dat"
+	contentType := "image/dat"
 	kekT, error := generateRandomBytes(16)
 	if error != nil {
 		return
@@ -54,7 +54,7 @@ func TestLRUCache(t *testing.T) {
 func TestInsertPaste(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Trololoo")
-	contentType := "daaddaaaa"
+	contentType := "wolo/daaddaaaa"
 	kekT, error := generateRandomBytes(16)
 	if error != nil {
 		return
@@ -91,7 +91,7 @@ func TestInsertPastaes(t *testing.T) {
 func TestInsertPasteBurnAfterReading(t *testing.T) {
 	pastaes = make(map[string]Pastae)
 	paste := []byte("Wololo")
-	contentType := "daadda"
+	contentType := "trolo/daadda"
 	kekT, error := generateRandomBytes(16)
 	if error != nil {
 		return
