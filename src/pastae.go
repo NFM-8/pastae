@@ -165,12 +165,17 @@ func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 }
 
 func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	sessid := r.Header.Get("pastae-sessid")
+	if sessid == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	uid, _ := sessionValid(r.Header.Get("pastae-sessid"))
 	if uid < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	res, err := db.Query("SELECT pid,expire,ct FROM data WHERE uid = $1", uid)
+	res, err := db.Query("SELECT pid,COALESCE(expire,0) as ex,ct FROM data WHERE uid = $1", uid)
 	defer res.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
