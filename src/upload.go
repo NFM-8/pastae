@@ -80,7 +80,11 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	if contentType == "text/plain" {
 		var id string
 		if session {
-			id = insertPasteToFile([]byte(r.FormValue("data")), bar, contentType, uid, expire, ukek)
+			if bar {
+				id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
+			} else {
+				id = insertPasteToFile([]byte(r.FormValue("data")), contentType, uid, expire, ukek)
+			}
 			sessionPasteCountMutex.Lock()
 			sessionPasteCount++
 			sessionPasteCountMutex.Unlock()
@@ -117,7 +121,11 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	contentType = "image/" + format
 	var id string
 	if session {
-		id = insertPasteToFile(data, bar, contentType, uid, expire, ukek)
+		if bar {
+			id = insertPaste(data, bar, contentType)
+		} else {
+			id = insertPasteToFile(data, contentType, uid, expire, ukek)
+		}
 		sessionPasteCountMutex.Lock()
 		sessionPasteCount++
 		sessionPasteCountMutex.Unlock()
@@ -196,7 +204,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	return configuration.URL + id
 }
 
-func insertPasteToFile(pasteData []byte, bar bool,
+func insertPasteToFile(pasteData []byte,
 	contentType string, uid int64, expire int64, ukek []byte) string {
 	rnd, error := generateRandomBytes(12)
 	if error != nil {
@@ -267,7 +275,7 @@ func insertPasteToFile(pasteData []byte, bar bool,
 	if fileStatus != dbStatus || fileStatus != "OK" {
 		return "ERROR"
 	}
-	return id
+	return configuration.URL + id
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {

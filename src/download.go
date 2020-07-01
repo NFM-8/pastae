@@ -48,15 +48,9 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		var nonce []byte
 		var uid int64
 		var contentType string
-		error := db.QueryRow("SELECT fname,key,nonce,uid,ct FROM data "+
-			"WHERE pid=$1", id).Scan(&fname, &key, &nonce, &uid, &contentType)
-		if error != nil {
-			log.Println(error)
-			http.NotFound(w, r)
-			return
-		}
 		var ukek []byte
-		error = db.QueryRow("SELECT kek FROM users WHERE id=$1", uid).Scan(&ukek)
+		error := db.QueryRow("SELECT fname,key,nonce,uid,ct,kek FROM data,users "+
+			"WHERE pid=$1 AND users.id=data.uid", id).Scan(&fname, &key, &nonce, &uid, &contentType, &ukek)
 		if error != nil {
 			log.Println(error)
 			http.NotFound(w, r)
