@@ -132,6 +132,10 @@ func registerUser(hash []byte) string {
 func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var hash []byte
 	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
+	if string(hash) == configuration.SessionPersistUser {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	defer r.Body.Close()
 	if err != nil {
 		log.Println(err)
