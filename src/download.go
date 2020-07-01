@@ -22,9 +22,7 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		w.Header().Set("content-type", data.ContentType)
 		w.Write(resp)
-		for i := 0; i < len(resp); i++ {
-			resp[i] = 0
-		}
+		go zeroByteArray(resp, len(resp))
 	} else {
 		http.NotFound(w, r)
 	}

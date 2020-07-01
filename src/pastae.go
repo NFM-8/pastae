@@ -29,6 +29,7 @@ type Configuration struct {
 	TLSCert             string        `json:"tlsCert"`
 	TLSKey              string        `json:"tlsKey"`
 	Session             bool          `json:"session"`
+	SessionPersistUser  string        `json:"sessionPersistUser"`
 	SessionTimeout      int64         `json:"sessionTimeout"`
 	SessionPath         string        `json:"sessionPath"`
 	SessionMaxEntries   int64         `json:"sessionMaxEntries"`
@@ -76,6 +77,7 @@ func main() {
 	kek = kekT
 
 	pasteServer := servePaste
+	uploadServer := uploadPaste
 	if configuration.Session {
 		if _, err := os.Stat(configuration.SessionPath); os.IsNotExist(err) {
 			log.Fatal("SessionPath (" + configuration.SessionPath + ") does not exist")
@@ -95,6 +97,7 @@ func main() {
 		go sessionCleaner(time.Minute)
 		go expiredCleaner(time.Minute)
 		pasteServer = servePasteS
+		uploadServer = uploadPasteS
 		l := len(configuration.SessionPath)
 		if l > 0 {
 			if configuration.SessionPath[l-1] != '/' {
@@ -110,14 +113,13 @@ func main() {
 	mux := httprouter.New()
 	mux.GET("/", serveFrontPage)
 	mux.GET("/:id", pasteServer)
-	mux.POST("/upload", uploadPaste)
+	mux.POST("/upload", uploadServer)
 	if configuration.Session {
-		mux.GET("/list", pasteList)
-		mux.POST("/uploadS", uploadPasteS)
-		mux.POST("/register", registerUserHandler)
-		mux.POST("/login", loginHandler)
-		mux.POST("/logout", logoutHandler)
-		mux.POST("/:id/expiry/:days", expiry)
+		mux.POST("/session/list", pasteList)
+		mux.POST("/session/register", registerUserHandler)
+		mux.POST("/session/login", loginHandler)
+		mux.POST("/session/logout", logoutHandler)
+		mux.POST("/expiry/:id/:days", expiry)
 		mux.DELETE("/:id", deleteHandler)
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
@@ -247,5 +249,15 @@ func createDbTablesAndIndexes() {
 	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_expire ON data USING btree (expire)")
 	if err != nil {
 		panic(err)
+	}
+	if configuration.SessionPersistUser != "" {
+		var kek []byte
+		err = db.QueryRow("SELECT kek FROM users WHERE hash=$1", configuration.SessionPersistUser).Scan(&kek)
+		if err != nil {
+			user := registerUser([]byte(configuration.SessionPersistUser))
+			if user == "ERROR" {
+				log.Println("Failed to create persist user")
+			}
+		}
 	}
 }

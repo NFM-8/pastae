@@ -271,7 +271,12 @@ func insertPasteToFile(pasteData []byte, bar bool,
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	uid, _ := sessionValid(r.Header.Get("pastae-sessid"))
+	sessid := r.Header.Get("pastae-sessid")
+	if sessid == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	uid, _ := sessionValid(sessid)
 	if uid < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 		return

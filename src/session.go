@@ -65,7 +65,7 @@ func cleanExpired() {
 			log.Println(err)
 			continue
 		}
-		db.QueryRow("DELETE FROM data WHERE id = $1", id)
+		db.QueryRow("DELETE FROM data WHERE id = $1", id) // TODO: check for errors!
 		sessionPasteCountMutex.Lock()
 		sessionPasteCount--
 		sessionPasteCountMutex.Unlock()
@@ -79,6 +79,17 @@ func cleanExpired() {
 }
 
 func sessionValid(token string) (int64, []byte) {
+	if token == "" && configuration.SessionPersistUser != "" {
+		var uid int64
+		var kek []byte
+		err := db.QueryRow("SELECT id, kek FROM users WHERE hash = $1",
+			configuration.SessionPersistUser).Scan(&uid, &kek)
+		if err != nil {
+			log.Println(err)
+			return -100, []byte("ERR")
+		}
+		return uid, kek
+	}
 	sessionMutex.RLock()
 	ses, ok := sessions[token]
 	sessionMutex.RUnlock()
