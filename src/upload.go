@@ -84,10 +84,10 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 				id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
 			} else {
 				id = insertPasteToFile([]byte(r.FormValue("data")), contentType, uid, expire, ukek)
+				sessionPasteCountMutex.Lock()
+				sessionPasteCount++
+				sessionPasteCountMutex.Unlock()
 			}
-			sessionPasteCountMutex.Lock()
-			sessionPasteCount++
-			sessionPasteCountMutex.Unlock()
 		} else {
 			id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
 		}
@@ -125,10 +125,10 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 			id = insertPaste(data, bar, contentType)
 		} else {
 			id = insertPasteToFile(data, contentType, uid, expire, ukek)
+			sessionPasteCountMutex.Lock()
+			sessionPasteCount++
+			sessionPasteCountMutex.Unlock()
 		}
-		sessionPasteCountMutex.Lock()
-		sessionPasteCount++
-		sessionPasteCountMutex.Unlock()
 	} else {
 		id = insertPaste(data, bar, contentType)
 	}
