@@ -9,6 +9,9 @@
   display: flex;
   justify-content: center;
 }
+.box {
+  margin-bottom: 35px;
+}
 .footer {
   padding: 10px;
   text-align: center;
@@ -24,6 +27,11 @@
   text-decoration: none;
   display: inline-block;
   font-size: 16px;
+}
+.text {
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f8f8;
 }
 textarea {
   width: 100%;
@@ -48,8 +56,14 @@ legend.sansserif {
 </style>
 </head>
 <body>
+
 <div class="flex-container">
-<div>
+<div class="box" id="woop"></div>
+</div>
+
+<div class="flex-container">
+
+<div class="box">
 <form action="/upload" id="paste" method="post" enctype="multipart/form-data">
   <fieldset>
     <legend class="sansserif">Upload paste</legend>
@@ -66,7 +80,7 @@ legend.sansserif {
 </form>
 </div>
 
-<div>
+<div class="box">
 <form action="/upload" id="upload" method="post" enctype="multipart/form-data">
     <fieldset>
       <legend class="sansserif">Upload image</legend>
@@ -81,9 +95,95 @@ legend.sansserif {
     </fieldset>
   </form>
 </div>
+
 </div>
+
+<div class="flex-container">
+  <div class="box" id="login">
+    <fieldset>
+      <legend class="sansserif">Log in</legend>
+      <p class="sansserif">
+      <label for="user-login">User name:</label><br>
+      <input type="text" name="user-login" id="user-login" class="text" required>
+      </p>
+      <p class="sansserif">
+      <label for="password-login">Password:</label><br>
+      <input type="password" name="password-login" id="password-login" class="text" required>
+      </p>
+      <p><button onclick="logIn()" class="button">Submit</button></p>
+    </fieldset>
+  </div>
+</div>
+
+<div class="flex-container">
+  <div class="box" id="register">
+  <fieldset>
+    <legend class="sansserif">Register</legend>
+    <p class="sansserif">
+    <label for="user-register">User name:</label><br>
+    <input type="text" name="user-register" id="user-register" class="text" required>
+    </p>
+    <p class="sansserif">
+    <label for="password-register">Password:</label><br>
+    <input type="password" name="password-register" id="password-register" class="text" required>
+    </p>
+    <p><button onclick="register()" class="button">Submit</button></p>
+  </fieldset>
+</div>
+</div>
+
 <div class="footer">
     <p class="sansserif">Powered by <a href="https://github.com/NFM-8/pastae">pastae</a></p>
 </div>
+
+<script>
+  async function logIn() {
+    var decoder = new TextDecoder();
+    const message1 = document.getElementById("user-login").value;
+    const message2 = document.getElementById("password-login").value;
+    const hash = await computeHash(message1, message2);
+
+    let response = await fetch('/session/login', {
+      method: 'POST',
+      body: btoa(String.fromCharCode(...new Uint8Array(hash)))
+    });
+
+    if(response.ok) {
+      let sessid = await response.text();
+      document.getElementById('woop').innerHTML =
+        "<p class=\"sansserif\">Logged in as " + message1 + "</p>";
+      document.getElementById('login').innerHTML = "";
+      document.getElementById('register').innerHTML = "";
+    }
+  }
+
+  async function register() {
+    var decoder = new TextDecoder();
+    const message1 = document.getElementById("user-register").value;
+    const message2 = document.getElementById("password-register").value;
+    const hash = await computeHash(message1, message2);
+
+    let response = await fetch('/session/register', {
+      method: 'POST',
+      body: btoa(String.fromCharCode(...new Uint8Array(hash)))
+    });
+
+    if(response.ok) {
+      let result = await response.text();
+      document.getElementById('woop').innerHTML =
+        "<p class=\"sansserif\">Registered user " + message1 +"</p>";
+      document.getElementById('login').innerHTML = "";
+    }
+  }
+
+  async function computeHash(text1, text2) {
+    const encoder = new TextEncoder();
+    const t = text1 + "FpF97vqSEMvfTWtMtwg27tGduc667XyCSfJKy4pZhRLmDsyMUsBbqQbbJEBbWyu6" + text2;
+    const h1 = await crypto.subtle.digest('SHA-512', encoder.encode(t));
+    const h2 = await crypto.subtle.digest('SHA-256', h1);
+    return await crypto.subtle.digest('SHA-512', h2);
+  }
+</script>
+
 </body>
 </html>
