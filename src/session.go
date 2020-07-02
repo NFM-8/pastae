@@ -50,7 +50,7 @@ func expiredCleaner(sleepTime time.Duration) {
 }
 
 func cleanExpired() {
-	r, err := db.Query("SELECT id,fname FROM data WHERE expire IS NOT NULL AND expire <= $1",
+	r, err := db.Query("DELETE FROM data WHERE expire IS NOT NULL AND expire <= $1 RETURNING fname",
 		time.Now().Unix())
 	defer r.Close()
 	if err != nil {
@@ -58,14 +58,12 @@ func cleanExpired() {
 		return
 	}
 	for r.Next() {
-		var id int64
 		var fname string
-		err = r.Scan(&id, &fname)
+		err = r.Scan(&fname)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		db.QueryRow("DELETE FROM data WHERE id = $1", id) // TODO: check for errors!
 		sessionPasteCountMutex.Lock()
 		sessionPasteCount--
 		sessionPasteCountMutex.Unlock()
