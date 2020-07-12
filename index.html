@@ -231,6 +231,7 @@ legend.sansserif {
   }
 
   async function listPastes() {
+    let originalHTML = document.getElementById("login").innerHTML;
     document.getElementById("login").innerHTML = "<div class=\"loader\"></div>";
     let response = await fetch("/session/list", {
         method: "POST",
@@ -246,6 +247,9 @@ legend.sansserif {
         plHTML += "<p class=\"sansserif\"> <a href=\"" + item.Id + "\"</a>" + item.Id + "</p>";
       });
       document.getElementById("login").innerHTML = plHTML;
+    }
+    else {
+      document.getElementById("login").innerHTML = originalHTML;
     }
   }
 
@@ -300,7 +304,9 @@ legend.sansserif {
     if(response.ok) {
       let result = await response.text();
       status.innerHTML = result;
-      await listPastes();
+      if(sessid !== undefined) {
+        await listPastes();
+      }
     }
     else {
       status.innerHTML = "Upload failed!";
@@ -344,7 +350,9 @@ legend.sansserif {
     if(response.ok) {
       let result = await response.text();
       status.innerHTML = result;
-      await listPastes();
+      if(sessid !== undefined) {
+        await listPastes();
+      }
     }
     else {
       status.innerHTML = "Upload failed!";
