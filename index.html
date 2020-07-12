@@ -243,9 +243,11 @@ legend.sansserif {
     if(response.ok) {
       let pl = await response.json();
       let plHTML = "";
-      pl.forEach(function (item, index) {
-        plHTML += "<p class=\"sansserif\"> <a href=\"" + item.Id + "\"</a>" + item.Id + "</p>";
-      });
+      if(pl !== null && pl !== undefined) {
+        pl.forEach(function (item, index) {
+          plHTML += "<p class=\"sansserif\"> <a href=\"" + item.Id + "\"</a>" + item.Id + "</p>";
+        });
+      }
       document.getElementById("login").innerHTML = plHTML;
     }
     else {
