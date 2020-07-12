@@ -157,3 +157,15 @@ func TestSessionValidation(t *testing.T) {
 		t.Errorf("Invalid session deemed valid")
 	}
 }
+
+func TestSessionCreationTimeUpdate(t *testing.T) {
+	var session Session
+	session.UserID = 100500
+	session.Created = time.Now().Unix() - 1000
+	sessions["update"] = session
+	updateSessionCreationTime("update")
+	updated := sessions["update"]
+	if updated.Created < time.Now().Unix() {
+		t.Errorf("Session creation time not updated")
+	}
+}

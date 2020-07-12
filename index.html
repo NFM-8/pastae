@@ -53,6 +53,18 @@ legend.sansserif {
   font-family: Arial, Helvetica, sans-serif;
   font-size: 1.875em;
 }
+.loader {
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #ccc;
+  width: 120px;
+  height: 120px;
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
 </head>
 <body>
@@ -64,14 +76,14 @@ legend.sansserif {
 <div class="flex-container">
 
 <div class="box" id="text-paste">
-<form action="/upload" id="paste" method="post" enctype="multipart/form-data">
+<form action="/upload" id="paste" method="post" enctype="multipart/form-data" onsubmit="sendPaste();return false">
   <fieldset>
     <legend class="sansserif">Upload paste</legend>
-    <textarea form="paste" name="data" autocomplete="off" rows="15" cols="80" required></textarea>
+    <textarea form="paste" id="text-paste-data" name="data" autocomplete="off" rows="15" cols="80" required></textarea>
     <input type="hidden" name="content-type" value="text/plain">
     <p class="sansserif">
         <label>
-          <input type="checkbox" name="bar" value="bar">
+          <input type="checkbox" id="paste-bar" name="bar" value="bar">
           Burn after reading
         </label>
     </p>
@@ -80,14 +92,14 @@ legend.sansserif {
 </form>
 </div>
 
-<div class="box" id="image-paste">
-<form action="/upload" id="upload" method="post" enctype="multipart/form-data">
+<div class="box" id="upload-paste">
+<form action="/upload" id="upload" method="post" enctype="multipart/form-data" onsubmit="sendUpload();return false">
     <fieldset>
       <legend class="sansserif">Upload image</legend>
-      <input type="file" name="file" class="button" required>
+      <input type="file" id="upload-paste-data" name="file" class="button" required>
       <p class="sansserif">
           <label>
-            <input type="checkbox" name="bar" value="bar">
+            <input type="checkbox" id="upload-bar" name="bar" value="bar">
             Burn after reading
           </label>
       </p>
@@ -110,7 +122,7 @@ legend.sansserif {
       <label for="password-login">Password:</label><br>
       <input type="password" name="password-login" id="password-login" class="text" required>
       </p>
-      <p><button onclick="logIn()" class="button">Submit</button></p>
+      <p><button onclick="logIn()" class="button">Log in</button></p>
     </fieldset>
   </div>
 </div>
@@ -127,7 +139,7 @@ legend.sansserif {
     <label for="password-register">Password:</label><br>
     <input type="password" name="password-register" id="password-register" class="text" required>
     </p>
-    <p><button onclick="register()" class="button">Submit</button></p>
+    <p><button onclick="register()" class="button">Register</button></p>
   </fieldset>
 </div>
 </div>
@@ -144,9 +156,23 @@ legend.sansserif {
   var defaultLogin;
   var defaultRegister;
 
+  async function keepAlive() {
+    if(sessid === undefined) {
+      return;
+    }
+    let response = await fetch("/session/ping", {
+        method: "POST",
+        body: "",
+        headers: {
+          "pastae-sessid": sessid
+        }
+      });
+  }
+  setInterval(keepAlive, 60000);
+
   function captureDefaultState() {
     if(!defaultStateCaptured) {
-      defaultImage = document.getElementById("image-paste").innerHTML;
+      defaultImage = document.getElementById("upload-paste").innerHTML;
       defaultText = document.getElementById("text-paste").innerHTML;
       defaultLogin = document.getElementById("login").innerHTML;
       defaultRegister = document.getElementById("register").innerHTML;
@@ -161,21 +187,23 @@ legend.sansserif {
     const message2 = document.getElementById("password-login").value;
     const hash = await computeHash(message1, message2);
 
-    let response = await fetch('/session/login', {
-      method: 'POST',
+    let response = await fetch("/session/login", {
+      method: "POST",
       body: btoa(String.fromCharCode(...new Uint8Array(hash)))
     });
 
     if(response.ok) {
       sessid = await response.text();
-      document.getElementById('banner').innerHTML =
+      document.getElementById("banner").innerHTML =
         "<p class=\"sansserif\">Logged in as " + message1 + "</p>" +
         "<p><button onclick=\"logOut()\" class=\"button\">Log out</button></p>";
-      document.getElementById('login').innerHTML = "";
-      document.getElementById('register').innerHTML = "";
+      document.getElementById("login").innerHTML = "";
+      document.getElementById("register").innerHTML = "";
+
+      await listPastes();
     }
     else {
-      document.getElementById('banner').innerHTML = "<p class=\"sansserif\">Login failed!</p>"
+      document.getElementById("banner").innerHTML = "<p class=\"sansserif\">Login failed!</p>"
     }
   }
 
@@ -202,6 +230,25 @@ legend.sansserif {
     }
   }
 
+  async function listPastes() {
+    document.getElementById("login").innerHTML = "<div class=\"loader\"></div>";
+    let response = await fetch("/session/list", {
+        method: "POST",
+        body: "",
+        headers: {
+          "pastae-sessid": sessid
+        }
+    });
+    if(response.ok) {
+      let pl = await response.json();
+      let plHTML = "";
+      pl.forEach(function (item, index) {
+        plHTML += "<p class=\"sansserif\"> <a href=\"" + item.Id + "\"</a>" + item.Id + "</p>";
+      });
+      document.getElementById("login").innerHTML = plHTML;
+    }
+  }
+
   async function logOut() {
     if(sessid !== undefined) {
       let response = await fetch('/session/logout', {
@@ -212,10 +259,104 @@ legend.sansserif {
     await reset();
   }
 
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function sendPaste() {
+    let box = document.getElementById("text-paste").innerHTML;
+
+    var formData = new FormData();
+    const data = document.getElementById("text-paste-data").value;
+    formData.append("data", data);
+    if(document.getElementById("paste-bar").checked) {
+      formData.append("bar", "bar");
+    }
+    formData.append("content-type", "text/plain");
+
+    document.getElementById("text-paste").innerHTML = "<div class=\"loader\"></div>";
+    let response;
+    if(sessid === undefined) {
+      response = await fetch("/upload", {
+        method: "POST",
+        body: formData
+      });
+    }
+    else {
+      response = await fetch("/upload", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "pastae-sessid": sessid
+        }
+      });
+    }
+    let status = document.getElementById("status");
+    if(status === null) {
+      document.getElementById("banner").insertAdjacentHTML("afterbegin",
+        "<p class=\"sansserif\" id=\"status\"></p>");
+      status = document.getElementById("status");
+    }
+    if(response.ok) {
+      let result = await response.text();
+      status.innerHTML = result;
+      await listPastes();
+    }
+    else {
+      status.innerHTML = "Upload failed!";
+    }
+    document.getElementById("text-paste").innerHTML = box;
+  }
+
+  async function sendUpload() {
+    let box = document.getElementById("upload-paste").innerHTML;
+
+    var formData = new FormData();
+    const file = document.getElementById("upload-paste-data").files[0];
+    formData.append("file", file);
+    if(document.getElementById("upload-bar").checked) {
+      formData.append("bar", "bar");
+    }
+
+    document.getElementById("upload-paste").innerHTML = "<div class=\"loader\"></div>";
+    let response;
+    if(sessid === undefined) {
+      response = await fetch("/upload", {
+        method: "POST",
+        body: formData
+      });
+    }
+    else {
+      response = await fetch("/upload", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "pastae-sessid": sessid
+        }
+      });
+    }
+    let status = document.getElementById("status");
+    if(status === null) {
+      document.getElementById("banner").insertAdjacentHTML("afterbegin",
+        "<p class=\"sansserif\" id=\"status\"></p>");
+      status = document.getElementById("status");
+    }
+    if(response.ok) {
+      let result = await response.text();
+      status.innerHTML = result;
+      await listPastes();
+    }
+    else {
+      status.innerHTML = "Upload failed!";
+    }
+    document.getElementById("upload-paste").innerHTML = box;
+  }
+
   async function reset() {
-    document.getElementById('banner').innerHTML = "";
+    sessid = undefined;
+    document.getElementById("banner").innerHTML = "";
     if(defaultStateCaptured) {
-      document.getElementById("image-paste").innerHTML = defaultImage;
+      document.getElementById("upload-paste").innerHTML = defaultImage;
       document.getElementById("text-paste").innerHTML = defaultText;
       document.getElementById("login").innerHTML = defaultLogin;
       document.getElementById("register").innerHTML = defaultRegister;

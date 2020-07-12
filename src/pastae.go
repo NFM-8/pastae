@@ -120,6 +120,7 @@ func main() {
 		mux.POST("/session/login", loginHandler)
 		mux.POST("/session/logout", logoutHandler)
 		mux.POST("/expiry/:id/:days", expiry)
+		mux.POST("/session/ping", pingHandler)
 		mux.DELETE("/:id", deleteHandler)
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
@@ -226,6 +227,29 @@ func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func pingHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	sessid := r.Header.Get("pastae-sessid")
+	if sessid == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	uid, _ := sessionValid(sessid)
+	if uid < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	updateSessionCreationTime(sessid)
+	w.WriteHeader(http.StatusOK)
+}
+
+func updateSessionCreationTime(sessid string) {
+	sessionMutex.Lock()
+	sessionData := sessions[sessid]
+	sessionData.Created = time.Now().Unix()
+	sessions[sessid] = sessionData
+	sessionMutex.Unlock()
 }
 
 func createDbTablesAndIndexes() {
