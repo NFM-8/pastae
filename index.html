@@ -12,6 +12,16 @@
 .box {
   margin-bottom: 35px;
 }
+.list-box {
+  display: flex;
+  justify-content: space-between;
+}
+.paste-id {
+  margin-right: 5px;
+}
+.delete {
+  margin-left: 5px;
+}
 .footer {
   padding: 10px;
   text-align: center;
@@ -245,7 +255,14 @@ legend.sansserif {
       let plHTML = "";
       if(pl !== null && pl !== undefined) {
         pl.forEach(function (item, index) {
-          plHTML += "<p class=\"sansserif\"> <a href=\"" + item.Id + "\"</a>" + item.Id + "</p>";
+          plHTML += "<div class=\"list-box\">";
+          plHTML += "<div class=\"paste-id\">";
+          plHTML += "<p class=\"sansserif\"> <a href=\"" + item.Id + "\">" + item.Id + "</a>";
+          plHTML += "</div>"
+          plHTML += "<div class=\"delete\">";
+          plHTML += "<button class=\"button\" onclick=\"deletePasteOrUpload('" + item.Id + "')\">Delete</button></p>";
+          plHTML += "</div>"
+          plHTML += "</div>"
         });
       }
       document.getElementById("login").innerHTML = plHTML;
@@ -360,6 +377,27 @@ legend.sansserif {
       status.innerHTML = "Upload failed!";
     }
     document.getElementById("upload-paste").innerHTML = box;
+  }
+
+  async function deletePasteOrUpload(id) {
+    if(sessid === undefined || sessid === null) {
+      return;
+    }
+    let response = await fetch("/" + id, {
+      method: "DELETE",
+      body: "",
+      headers: {
+        "pastae-sessid": sessid
+      }
+    });
+    if(response.ok) {
+      if(sessid !== undefined) {
+        await listPastes();
+      }
+    }
+    else {
+      status.innerHTML = "Failed to delete paste " + id;
+    }
   }
 
   async function reset() {
