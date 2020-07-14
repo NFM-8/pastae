@@ -68,6 +68,10 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 				if err != nil {
 					log.Println(err)
 				}
+				if fname == "" {
+					log.Println("empty file name")
+					return
+				}
 				err = os.Remove(configuration.SessionPath + fname)
 				if err != nil {
 					log.Println(err)
@@ -222,6 +226,9 @@ func insertPasteToFile(pasteData []byte,
 		return "ERROR"
 	}
 	fileName := hex.EncodeToString(rnd)
+	if fileName == "" {
+		return "ERROR"
+	}
 	nonce, error := generateRandomBytes(12)
 	if error != nil {
 		return "ERROR"
@@ -295,6 +302,13 @@ func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		err := db.QueryRow("DELETE FROM data WHERE pid = $1 RETURNING fname", pid).Scan(&fname)
 		if err != nil {
 			log.Println(err)
+			return
+		}
+		if fname == "" {
+			log.Println("empty file name")
+			sessionPasteCountMutex.Lock()
+			sessionPasteCount--
+			sessionPasteCountMutex.Unlock()
 			return
 		}
 		err = os.Remove(configuration.SessionPath + fname)
