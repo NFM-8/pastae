@@ -159,12 +159,12 @@ legend.sansserif {
 </div>
 
 <script>
-  var sessid;
-  var defaultStateCaptured = false;
-  var defaultImage;
-  var defaultText;
-  var defaultLogin;
-  var defaultRegister;
+  let sessid = undefined;
+  let defaultStateCaptured = false;
+  let defaultImage;
+  let defaultText;
+  let defaultLogin;
+  let defaultRegister;
 
   async function keepAlive() {
     if(sessid === undefined) {
@@ -192,7 +192,6 @@ legend.sansserif {
 
   async function logIn() {
     captureDefaultState();
-    var decoder = new TextDecoder();
     const message1 = document.getElementById("user-login").value;
     const message2 = document.getElementById("password-login").value;
     const hash = await computeHash(message1, message2);
@@ -219,7 +218,6 @@ legend.sansserif {
 
   async function register() {
     captureDefaultState();
-    var decoder = new TextDecoder();
     const message1 = document.getElementById("user-register").value;
     const message2 = document.getElementById("password-register").value;
     const hash = await computeHash(message1, message2);
@@ -282,14 +280,10 @@ legend.sansserif {
     await reset();
   }
 
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   async function sendPaste() {
     let box = document.getElementById("text-paste").innerHTML;
 
-    var formData = new FormData();
+    let formData = new FormData();
     const data = document.getElementById("text-paste-data").value;
     formData.append("data", data);
     if(document.getElementById("paste-bar").checked) {
@@ -336,7 +330,7 @@ legend.sansserif {
   async function sendUpload() {
     let box = document.getElementById("upload-paste").innerHTML;
 
-    var formData = new FormData();
+    let formData = new FormData();
     const file = document.getElementById("upload-paste-data").files[0];
     formData.append("file", file);
     if(document.getElementById("upload-bar").checked) {
