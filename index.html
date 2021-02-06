@@ -91,6 +91,11 @@ legend.sansserif {
     <legend class="sansserif">Upload paste</legend>
     <textarea form="paste" id="text-paste-data" name="data" autocomplete="off" rows="15" cols="80" required></textarea>
     <input type="hidden" name="content-type" value="text/plain">
+    <p>
+      <button class="button" type="button" onclick="pasteFromClipboard()">
+        Paste from clipboard
+      </button>
+    </p>
     <p class="sansserif">
         <label>
           <input type="checkbox" id="paste-bar" name="bar" value="bar">
@@ -159,6 +164,7 @@ legend.sansserif {
 </div>
 
 <script>
+  const keepAliveMs = 60000;
   let sessid = undefined;
   let defaultStateCaptured = false;
   let defaultImage;
@@ -178,7 +184,7 @@ legend.sansserif {
         }
       });
   }
-  setInterval(keepAlive, 60000);
+  setInterval(keepAlive, keepAliveMs);
 
   function captureDefaultState() {
     if(!defaultStateCaptured) {
@@ -234,7 +240,7 @@ legend.sansserif {
       document.getElementById('register').innerHTML = "";
     }
     else {
-      document.getElementById('banner').innerHTML = "<p class=\"sansserif\">Register failed!</p>"
+      document.getElementById('banner').innerHTML = "<p class=\"sansserif\">Register failed!</p>";
     }
   }
 
@@ -278,6 +284,27 @@ legend.sansserif {
       });
     }
     await reset();
+  }
+
+  async function pasteFromClipboard() {
+    if(navigator.clipboard) {
+      let clipPaste;
+      try { clipPaste = await navigator.clipboard.readText(); }
+      catch(e) {
+        clipBoardNotSupported();
+        console.log(e);
+        return;
+      }
+      document.getElementById("text-paste-data").value = clipPaste;
+    }
+    else {
+      clipBoardNotSupported();
+    }
+  }
+
+  async function clipBoardNotSupported() {
+    document.getElementById('banner').innerHTML =
+        "<p class=\"sansserif\">Clipboard API is not supported</p>";
   }
 
   async function sendPaste() {
