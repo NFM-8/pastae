@@ -82,6 +82,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	contentType := r.FormValue("content-type")
 	bar := r.FormValue("bar") == "bar"
 	if contentType == "text/plain" {
+		contentType += ";charset=utf-8"
 		var id string
 		if session {
 			if bar {
@@ -185,7 +186,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 		return "ERROR"
 	}
 	id := hex.EncodeToString(rnd)
-	if contentType == "text/plain" {
+	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
 		id += ".txt"
 	} else {
 		ct := strings.Split(contentType, "/")
@@ -215,7 +216,7 @@ func insertPasteToFile(pasteData []byte,
 		return "ERROR"
 	}
 	id := hex.EncodeToString(rnd)
-	if contentType == "text/plain" {
+	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
 		id += ".txt"
 	} else {
 		ct := strings.Split(contentType, "/")
