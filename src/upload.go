@@ -148,21 +148,14 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 }
 
 func insertPaste(pasteData []byte, bar bool, contentType string) string {
-	if len(pastaes) >= configuration.MaxEntries {
-		if firstPastae != nil {
-			id := firstPastae.Id
-			pastaeMutex.Lock()
-			if firstPastae.Next != nil {
-				firstPastae.Next.Prev = nil
-				firstPastae = firstPastae.Next
-			} else {
-				firstPastae = nil
-				lastPastae = nil
-			}
-			delete(pastaes, id)
-			pastaeMutex.Unlock()
+	pastaeMutex.Lock()
+	if len(pastaeMap) >= configuration.MaxEntries {
+		if pastaeList.Len() > 0 {
+			delete(pastaeMap, pastaeList.Front().Value.(Pastae).Id)
+			pastaeList.Remove(pastaeList.Front())
 		}
 	}
+	pastaeMutex.Unlock()
 	var paste Pastae
 	paste.BurnAfterReading = bar
 	nonce, error := generateRandomBytes(12)
@@ -192,19 +185,10 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 		ct := strings.Split(contentType, "/")
 		id += "." + ct[1]
 	}
-	paste.Next = nil
-	paste.Prev = nil
 	paste.Id = id
 	pastaeMutex.Lock()
-	pastaes[id] = paste
-	if lastPastae != nil {
-		lastPastae.Next = &paste
-		paste.Prev = lastPastae
-		lastPastae = &paste
-	} else {
-		firstPastae = &paste
-		lastPastae = &paste
-	}
+	pastaeMap[id] = paste
+	pastaeList.PushBack(paste)
 	pastaeMutex.Unlock()
 	return configuration.URL + id
 }

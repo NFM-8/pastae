@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"container/list"
 
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq"
@@ -44,8 +45,6 @@ type Pastae struct {
 	Key              []byte
 	Nonce            []byte
 	Payload          []byte
-	Next             *Pastae
-	Prev             *Pastae
 }
 
 type PastaeListing struct {
@@ -55,9 +54,8 @@ type PastaeListing struct {
 }
 
 var configuration Configuration
-var pastaes map[string]Pastae
-var firstPastae *Pastae
-var lastPastae *Pastae
+var pastaeMap map[string]Pastae
+var pastaeList *list.List
 var pastaeMutex sync.RWMutex
 var sessionMutex sync.RWMutex
 var sessions map[string]Session
@@ -69,7 +67,8 @@ var db *sql.DB
 
 func main() {
 	readConfig()
-	pastaes = make(map[string]Pastae)
+	pastaeMap = make(map[string]Pastae)
+	pastaeList = list.New()
 	kekT, error := generateRandomBytes(1024)
 	if error != nil {
 		log.Fatal(error)

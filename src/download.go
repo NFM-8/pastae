@@ -12,7 +12,7 @@ import (
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
 	pastaeMutex.RLock()
-	data, ok := pastaes[id]
+	data, ok := pastaeMap[id]
 	pastaeMutex.RUnlock()
 	if ok {
 		resp, error := fetchPaste(data)
@@ -31,7 +31,7 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
 	pastaeMutex.RLock()
-	data, ok := pastaes[id]
+	data, ok := pastaeMap[id]
 	pastaeMutex.RUnlock()
 	if ok {
 		resp, error := fetchPaste(data)
@@ -83,17 +83,8 @@ func fetchPaste(pasta Pastae) ([]byte, error) {
 	}
 	if pasta.BurnAfterReading {
 		pastaeMutex.Lock()
-		if pasta.Next != nil {
-			pasta.Next.Prev = pasta.Prev
-		} else {
-			lastPastae = pasta.Prev
-		}
-		if pasta.Prev != nil {
-			pasta.Prev.Next = pasta.Next
-		} else {
-			firstPastae = pasta.Next
-		}
-		delete(pastaes, pasta.Id)
+		delete(pastaeMap, pastaeList.Front().Value.(Pastae).Id)
+		pastaeList.Remove(pastaeList.Front())
 		pastaeMutex.Unlock()
 	}
 	return resp, nil

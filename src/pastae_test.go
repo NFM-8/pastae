@@ -3,11 +3,13 @@ package main
 import (
 	"testing"
 	"time"
+	"container/list"
 )
 
 func TestLRUCache(t *testing.T) {
 	configuration.MaxEntries = 2
-	pastaes = make(map[string]Pastae)
+	pastaeMap = make(map[string]Pastae)
+	pastaeList = list.New()
 	paste := []byte("Trololooloti")
 	contentType := "image/dat"
 	kekT, error := generateRandomBytes(16)
@@ -15,23 +17,28 @@ func TestLRUCache(t *testing.T) {
 		return
 	}
 	kek = kekT
+	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
 	id1 := insertPaste(paste, false, contentType)
+	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
 	id2 := insertPaste(paste, false, contentType)
+	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
 	id3 := insertPaste(paste, false, contentType)
+	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
 	id4 := insertPaste(paste, false, contentType)
-	data, ok := pastaes[id1]
+	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
+	data, ok := pastaeMap[id1]
 	if ok {
 		t.Errorf("Cache clearing failed")
 	}
-	data, ok = pastaes[id2]
+	data, ok = pastaeMap[id2]
 	if ok {
 		t.Errorf("Cache clearing failed")
 	}
-	data, ok = pastaes[id3]
+	data, ok = pastaeMap[id3]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
-	data, ok = pastaes[id4]
+	data, ok = pastaeMap[id4]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -52,7 +59,8 @@ func TestLRUCache(t *testing.T) {
 }
 
 func TestInsertPaste(t *testing.T) {
-	pastaes = make(map[string]Pastae)
+	pastaeMap = make(map[string]Pastae)
+	pastaeList = list.New()
 	paste := []byte("Trololoo")
 	contentType := "wolo/daaddaaaa"
 	kekT, error := generateRandomBytes(16)
@@ -61,7 +69,7 @@ func TestInsertPaste(t *testing.T) {
 	}
 	kek = kekT
 	id := insertPaste(paste, false, contentType)
-	data, ok := pastaes[id]
+	data, ok := pastaeMap[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -89,7 +97,8 @@ func TestInsertPastaes(t *testing.T) {
 }
 
 func TestInsertPasteBurnAfterReading(t *testing.T) {
-	pastaes = make(map[string]Pastae)
+	pastaeMap = make(map[string]Pastae)
+	pastaeList = list.New()
 	paste := []byte("Wololo")
 	contentType := "trolo/daadda"
 	kekT, error := generateRandomBytes(16)
@@ -98,7 +107,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	}
 	kek = kekT
 	id := insertPaste(paste, true, contentType)
-	data, ok := pastaes[id]
+	data, ok := pastaeMap[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -109,7 +118,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
-	data, ok = pastaes[id]
+	data, ok = pastaeMap[id]
 	if ok {
 		t.Errorf("Paste not burned after fetching")
 	}
