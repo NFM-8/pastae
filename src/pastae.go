@@ -1,41 +1,42 @@
 package main
 
 import (
+	"container/list"
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
-	"container/list"
 
+	_ "github.com/glebarez/go-sqlite"
 	"github.com/julienschmidt/httprouter"
-	_ "github.com/lib/pq"
 )
 
 type Configuration struct {
-	URL                 string        `json:"url"`
-	Listen              string        `json:"listen"`
-	FrontPage           string        `json:"frontPage"`
-	ReadTimeout         time.Duration `json:"readTimeout"`
-	WriteTimeout        time.Duration `json:"writeTimeout"`
-	MaxEntries          int           `json:"maxEntries"`
-	MaxEntrySize        int64         `json:"maxEntrySize"`
-	MaxHeaderBytes      int           `json:"maxHeaderBytes"`
-	TLS                 bool          `json:"tls"`
-	TLSCert             string        `json:"tlsCert"`
-	TLSKey              string        `json:"tlsKey"`
-	Session             bool          `json:"session"`
-	SessionPersistUser  string        `json:"sessionPersistUser"`
-	SessionTimeout      int64         `json:"sessionTimeout"`
-	SessionPath         string        `json:"sessionPath"`
-	SessionMaxEntries   int64         `json:"sessionMaxEntries"`
-	SessionMaxEntrySize int64         `json:"sessionMaxEntrySize"`
-	SessionConnStr      string        `json:"sessionConnStr"`
+	URL                  string        `json:"url"`
+	Listen               string        `json:"listen"`
+	FrontPage            string        `json:"frontPage"`
+	ReadTimeout          time.Duration `json:"readTimeout"`
+	WriteTimeout         time.Duration `json:"writeTimeout"`
+	MaxEntries           int           `json:"maxEntries"`
+	MaxEntrySize         int64         `json:"maxEntrySize"`
+	MaxHeaderBytes       int           `json:"maxHeaderBytes"`
+	TLS                  bool          `json:"tls"`
+	TLSCert              string        `json:"tlsCert"`
+	TLSKey               string        `json:"tlsKey"`
+	DataPath             string        `json:"dataPath"`
+	Database             bool          `json:"database"`
+	DatabasePersistUser  string        `json:"databasePersistUser"`
+	DatabaseTimeout      int64         `json:"databaseTimeout"`
+	DatabaseMaxEntries   int64         `json:"databaseMaxEntries"`
+	DatabaseMaxEntrySize int64         `json:"databaseMaxEntrySize"`
+	DatabaseFile         string        `json:"databaseFile"`
 }
 
 type Pastae struct {
@@ -53,67 +54,71 @@ type PastaeListing struct {
 	ContentType string
 }
 
-var configuration Configuration
-var pastaeMap map[string]Pastae
-var pastaeList *list.List
-var pastaeMutex sync.RWMutex
-var sessionMutex sync.RWMutex
-var sessions map[string]Session
-var sessionPasteCount int64
-var sessionPasteCountMutex sync.RWMutex
-var kek []byte
-var frontPage []byte
-var db *sql.DB
+var CONFIGURATION Configuration
+var PASTAEMAP map[string]Pastae
+var PASTAELIST *list.List
+var PASTAEMUTEX sync.RWMutex
+var SESSIONMUTEX sync.RWMutex
+var SESSIONS map[string]Session
+var SESSIONPASTECOUNT atomic.Int64
+var KEK []byte
+var FRONTPAGE []byte
+var DB *sql.DB
 
 func main() {
-	readConfig()
-	pastaeMap = make(map[string]Pastae)
-	pastaeList = list.New()
-	kekT, error := generateRandomBytes(1024)
-	if error != nil {
-		log.Fatal(error)
+	err := readConfig("pastae.json")
+	if err != nil {
+		log.Fatal(err)
 	}
-	kek = kekT
+	PASTAEMAP = make(map[string]Pastae)
+	PASTAELIST = list.New()
+	KEK, err = generateRandomBytes(1024)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	pasteServer := servePaste
 	uploadServer := uploadPaste
-	if configuration.Session {
-		if _, err := os.Stat(configuration.SessionPath); os.IsNotExist(err) {
-			log.Fatal("SessionPath (" + configuration.SessionPath + ") does not exist")
+	if CONFIGURATION.Database {
+		if _, err := os.Stat(CONFIGURATION.DataPath); os.IsNotExist(err) {
+			log.Fatal("SessionPath (" + CONFIGURATION.DataPath + ") does not exist")
 		}
-		tdb, err := sql.Open("postgres", configuration.SessionConnStr)
-		defer tdb.Close()
+		DB, err = sql.Open("sqlite", CONFIGURATION.DatabaseFile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = tdb.Ping()
+		err = DB.Ping()
 		if err != nil {
 			log.Fatal(err)
 		}
-		db = tdb
-		createDbTablesAndIndexes()
-		sessions = make(map[string]Session)
+		err = createDbTablesAndIndexes(DB)
+		if err != nil {
+			log.Fatal(err)
+		}
+		SESSIONS = make(map[string]Session)
 		go sessionCleaner(time.Minute)
-		go expiredCleaner(time.Minute)
+		go expiredCleaner(DB, time.Minute)
 		pasteServer = servePasteS
 		uploadServer = uploadPasteS
-		l := len(configuration.SessionPath)
+		l := len(CONFIGURATION.DataPath)
 		if l > 0 {
-			if configuration.SessionPath[l-1] != '/' {
-				configuration.SessionPath += "/"
+			if CONFIGURATION.DataPath[l-1] != '/' {
+				CONFIGURATION.DataPath += "/"
 			}
 		}
-		err = db.QueryRow("SELECT COUNT(id) FROM data").Scan(&sessionPasteCount)
+		var tmpCount int64 = 0
+		err = DB.QueryRow("SELECT COUNT(id) FROM data").Scan(&tmpCount)
 		if err != nil {
 			log.Fatal(err)
 		}
+		SESSIONPASTECOUNT.Store(tmpCount)
 	}
 
 	mux := httprouter.New()
 	mux.GET("/", serveFrontPage)
 	mux.GET("/:id", pasteServer)
 	mux.POST("/upload", uploadServer)
-	if configuration.Session {
+	if CONFIGURATION.Database {
 		mux.POST("/session/list", pasteList)
 		mux.POST("/session/register", registerUserHandler)
 		mux.POST("/session/login", loginHandler)
@@ -124,44 +129,45 @@ func main() {
 	}
 	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
 	s := &http.Server{
-		Addr:           configuration.Listen,
+		Addr:           CONFIGURATION.Listen,
 		Handler:        mux,
 		TLSConfig:      tlsConfig,
-		ReadTimeout:    configuration.ReadTimeout * time.Second,
-		WriteTimeout:   configuration.WriteTimeout * time.Second,
-		MaxHeaderBytes: configuration.MaxHeaderBytes,
+		ReadTimeout:    CONFIGURATION.ReadTimeout * time.Second,
+		WriteTimeout:   CONFIGURATION.WriteTimeout * time.Second,
+		MaxHeaderBytes: CONFIGURATION.MaxHeaderBytes,
 	}
-	if configuration.TLS {
-		log.Fatal(s.ListenAndServeTLS(configuration.TLSCert, configuration.TLSKey))
+	if CONFIGURATION.TLS {
+		log.Fatal(s.ListenAndServeTLS(CONFIGURATION.TLSCert, CONFIGURATION.TLSKey))
 	} else {
 		log.Fatal(s.ListenAndServe())
 	}
 	return
 }
 
-func readConfig() {
-	c, err := ioutil.ReadFile("pastae.json")
+func readConfig(file string) error {
+	c, err := os.ReadFile(file)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	err = json.Unmarshal(c, &configuration)
+	err = json.Unmarshal(c, &CONFIGURATION)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	l := len(configuration.URL)
+	l := len(CONFIGURATION.URL)
 	if l > 0 {
-		if configuration.URL[l-1] != '/' {
-			configuration.URL += "/"
+		if CONFIGURATION.URL[l-1] != '/' {
+			CONFIGURATION.URL += "/"
 		}
 	}
-	frontPage, err = ioutil.ReadFile(configuration.FrontPage)
+	FRONTPAGE, err = os.ReadFile(CONFIGURATION.FrontPage)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	w.Write(frontPage)
+	w.Write(FRONTPAGE)
 }
 
 func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -170,12 +176,12 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	uid, _ := sessionValid(sessid)
-	if uid < 0 {
+	uid, _, err := sessionValid(DB, sessid)
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	res, err := db.Query("SELECT pid,COALESCE(expire,0) as ex,ct FROM data WHERE uid = $1", uid)
+	res, err := DB.Query("SELECT pid,COALESCE(expire,0) as ex,ct FROM data WHERE uid = $1", uid)
 	defer res.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -208,8 +214,8 @@ func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	uid, _ := sessionValid(sessid)
-	if uid < 0 {
+	uid, _, err := sessionValid(DB, sessid)
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -220,7 +226,7 @@ func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	t := time.Now().Unix() + days*60*60*24
-	_, err = db.Exec("UPDATE data SET expire = $1 WHERE pid = $2 AND uid = $3", t, id, uid)
+	_, err = DB.Exec("UPDATE data SET expire = $1 WHERE pid = $2 AND uid = $3", t, id, uid)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -234,8 +240,8 @@ func pingHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	uid, _ := sessionValid(sessid)
-	if uid < 0 {
+	_, _, err := sessionValid(DB, sessid)
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -244,53 +250,71 @@ func pingHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func updateSessionCreationTime(sessid string) {
-	sessionMutex.Lock()
-	sessionData := sessions[sessid]
+	SESSIONMUTEX.Lock()
+	defer SESSIONMUTEX.Unlock()
+	sessionData := SESSIONS[sessid]
 	sessionData.Created = time.Now().Unix()
-	sessions[sessid] = sessionData
-	sessionMutex.Unlock()
+	SESSIONS[sessid] = sessionData
 }
 
-func createDbTablesAndIndexes() {
-	_, err := db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS users (" +
-		"id BIGSERIAL PRIMARY KEY," +
-		"hash BYTEA NOT NULL UNIQUE," +
-		"kek BYTEA NOT NULL)")
+func createDbTablesAndIndexes(db *sql.DB) error {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS users (" +
+		"id INTEGER PRIMARY KEY," +
+		"hash TEXT NOT NULL UNIQUE," +
+		"kek BLOB NOT NULL)")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	_, err = db.Exec("CREATE UNLOGGED TABLE IF NOT EXISTS data (" +
-		"id BIGSERIAL PRIMARY KEY," +
-		"uid BIGINT NOT NULL," +
-		"pid VARCHAR NOT NULL," +
-		"fname VARCHAR NOT NULL," +
-		"key BYTEA NOT NULL," +
-		"nonce BYTEA NOT NULL," +
-		"ct VARCHAR NOT NULL," +
-		"expire BIGINT)")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS data (" +
+		"id INTEGER PRIMARY KEY," +
+		"uid INTEGER NOT NULL," +
+		"pid TEXT NOT NULL," +
+		"fname TEXT NOT NULL," +
+		"key BLOB NOT NULL," +
+		"nonce BLOB NOT NULL," +
+		"ct TEXT NOT NULL," +
+		"expire INTEGER)")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_uid ON data USING hash (uid)")
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_uid ON data (uid)")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	_, err = db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS data_pid ON data USING btree (pid)")
+	_, err = db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS data_pid ON data (pid)")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_expire ON data USING btree (expire)")
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS data_expire ON data (expire)")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	if configuration.SessionPersistUser != "" {
+	if CONFIGURATION.DatabasePersistUser != "" {
 		var kek []byte
-		err = db.QueryRow("SELECT kek FROM users WHERE hash=$1", configuration.SessionPersistUser).Scan(&kek)
+		err = db.QueryRow("SELECT kek FROM users WHERE hash=$1", CONFIGURATION.DatabasePersistUser).Scan(&kek)
 		if err != nil {
-			user := registerUser([]byte(configuration.SessionPersistUser))
-			if user == "ERROR" {
-				log.Println("Failed to create persist user")
+			err = registerUser(db, CONFIGURATION.DatabasePersistUser)
+			if err != nil {
+				return err
 			}
 		}
+	}
+	return nil
+}
+
+func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
+	defer r.Body.Close()
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	err = registerUser(DB, string(hash))
+	if err == nil {
+		w.Write([]byte("OK"))
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 }

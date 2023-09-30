@@ -1,9 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -28,28 +29,32 @@ func sessionCleaner(sleepTime time.Duration) {
 func cleanSessions() {
 	t := time.Now().Unix()
 	var expired []string
-	sessionMutex.RLock()
-	for k, v := range sessions {
-		if t-v.Created >= configuration.SessionTimeout {
+	SESSIONMUTEX.Lock()
+	defer SESSIONMUTEX.Unlock()
+	for k, v := range SESSIONS {
+		if t-v.Created >= CONFIGURATION.DatabaseTimeout {
 			expired = append(expired, k)
 		}
 	}
-	sessionMutex.RUnlock()
-	sessionMutex.Lock()
 	for _, k := range expired {
-		delete(sessions, k)
+		delete(SESSIONS, k)
 	}
-	sessionMutex.Unlock()
 }
 
-func expiredCleaner(sleepTime time.Duration) {
+func expiredCleaner(db *sql.DB, sleepTime time.Duration) {
+	if db == nil {
+		return
+	}
 	for {
 		time.Sleep(sleepTime)
-		cleanExpired()
+		cleanExpired(db)
 	}
 }
 
-func cleanExpired() {
+func cleanExpired(db *sql.DB) {
+	if db == nil {
+		return
+	}
 	r, err := db.Query("DELETE FROM data WHERE expire IS NOT NULL AND expire <= $1 RETURNING fname",
 		time.Now().Unix())
 	defer r.Close()
@@ -64,11 +69,9 @@ func cleanExpired() {
 			log.Println(err)
 			continue
 		}
-		sessionPasteCountMutex.Lock()
-		sessionPasteCount--
-		sessionPasteCountMutex.Unlock()
+		SESSIONPASTECOUNT.Add(-1)
 		go func(fname string) {
-			err = os.Remove(configuration.SessionPath + fname)
+			err = os.Remove(CONFIGURATION.DataPath + fname)
 			if err != nil {
 				log.Println(err)
 			}
@@ -76,61 +79,48 @@ func cleanExpired() {
 	}
 }
 
-func sessionValid(token string) (int64, []byte) {
-	if token == "" && configuration.SessionPersistUser != "" {
+func sessionValid(db *sql.DB, token string) (int64, []byte, error) {
+	if db == nil {
+		return -100, []byte("nil db"), errors.New("nil db")
+	}
+	if token == "" && CONFIGURATION.DatabasePersistUser != "" {
 		var uid int64
 		var kek []byte
 		err := db.QueryRow("SELECT id, kek FROM users WHERE hash = $1",
-			configuration.SessionPersistUser).Scan(&uid, &kek)
+			CONFIGURATION.DatabasePersistUser).Scan(&uid, &kek)
 		if err != nil {
-			log.Println(err)
-			return -100, []byte("ERR")
+			return -100, []byte(err.Error()), errors.New("sessionValid")
 		}
-		return uid, kek
+		return uid, kek, nil
 	}
-	sessionMutex.RLock()
-	ses, ok := sessions[token]
-	sessionMutex.RUnlock()
+	SESSIONMUTEX.RLock()
+	defer SESSIONMUTEX.RUnlock()
+	ses, ok := SESSIONS[token]
 	if !ok {
-		return -100, []byte("ERR")
+		return -100, []byte("Invalid session"), errors.New("sessionValid")
 	}
-	return ses.UserID, ses.Kek
+	return ses.UserID, ses.Kek, nil
 }
 
-func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	var hash []byte
-	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
-	defer r.Body.Close()
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+func registerUser(db *sql.DB, hash string) error {
+	if len(hash) == 0 {
+		return errors.New("Empty hash")
 	}
-	if registerUser(hash) == "OK" {
-		w.Write([]byte("OK"))
-	} else {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-}
-
-func registerUser(hash []byte) string {
 	kek, err := generateRandomBytes(64)
 	if err != nil {
-		log.Println(err)
-		return "ERROR"
+		return err
 	}
 	_, err = db.Exec("INSERT INTO users (hash,kek) VALUES ($1, $2)", hash, kek)
 	if err != nil {
-		log.Println(err)
-		return "ERROR"
+		return err
 	}
-	return "OK"
+	return nil
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var hash []byte
-	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
-	if string(hash) == configuration.SessionPersistUser {
+	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
+	if string(hash) == CONFIGURATION.DatabasePersistUser {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -142,7 +132,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 	var uid int64
 	var kek []byte
-	err = db.QueryRow("SELECT id, kek FROM users WHERE hash = $1", string(hash)).Scan(&uid, &kek)
+	err = DB.QueryRow("SELECT id, kek FROM users WHERE hash = $1", string(hash)).Scan(&uid, &kek)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusUnauthorized)
@@ -150,19 +140,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 	sidb, _ := generateRandomBytes(64)
 	sid := hex.EncodeToString(sidb)
-	var sess Session
-	sess.Created = time.Now().Unix()
-	sess.Kek = kek
-	sess.UserID = uid
-	sessionMutex.Lock()
-	sessions[sid] = sess
-	sessionMutex.Unlock()
+	SESSIONMUTEX.Lock()
+	defer SESSIONMUTEX.Unlock()
+	SESSIONS[sid] = Session{Created: time.Now().Unix(), Kek: kek, UserID: uid}
 	w.Write([]byte(sid))
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var hash []byte
-	hash, err := ioutil.ReadAll(io.LimitReader(r.Body, 100))
+	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer r.Body.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -170,14 +156,11 @@ func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 	}
 	w.WriteHeader(http.StatusOK)
 	go func(hash []byte) {
-		sessionMutex.RLock()
-		sessid, _ := sessionValid(string(hash))
-		sessionMutex.RUnlock()
-		if sessid < 0 {
-			return
+		SESSIONMUTEX.Lock()
+		defer SESSIONMUTEX.Unlock()
+		_, _, err := sessionValid(DB, string(hash))
+		if err == nil {
+			delete(SESSIONS, string(hash))
 		}
-		sessionMutex.Lock()
-		delete(sessions, string(hash))
-		sessionMutex.Unlock()
 	}(hash)
 }

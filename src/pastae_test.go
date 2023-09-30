@@ -1,44 +1,55 @@
 package main
 
 import (
+	"container/list"
+	"database/sql"
 	"testing"
 	"time"
-	"container/list"
 )
 
 func TestLRUCache(t *testing.T) {
-	configuration.MaxEntries = 2
-	pastaeMap = make(map[string]Pastae)
-	pastaeList = list.New()
+	CONFIGURATION.MaxEntries = 2
+	PASTAEMAP = make(map[string]Pastae)
+	PASTAELIST = list.New()
 	paste := []byte("Trololooloti")
 	contentType := "image/dat"
-	kekT, error := generateRandomBytes(16)
-	if error != nil {
+	var err error
+	KEK, err = generateRandomBytes(16)
+	if err != nil {
 		return
 	}
-	kek = kekT
-	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
+	if len(PASTAEMAP) != PASTAELIST.Len() {
+		t.Errorf("Size mismatch")
+	}
 	id1 := insertPaste(paste, false, contentType)
-	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
+	if len(PASTAEMAP) != PASTAELIST.Len() {
+		t.Errorf("Size mismatch")
+	}
 	id2 := insertPaste(paste, false, contentType)
-	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
+	if len(PASTAEMAP) != PASTAELIST.Len() {
+		t.Errorf("Size mismatch")
+	}
 	id3 := insertPaste(paste, false, contentType)
-	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
+	if len(PASTAEMAP) != PASTAELIST.Len() {
+		t.Errorf("Size mismatch")
+	}
 	id4 := insertPaste(paste, false, contentType)
-	if len(pastaeMap) != pastaeList.Len() {t.Errorf("Size mismatch")}
-	data, ok := pastaeMap[id1]
+	if len(PASTAEMAP) != PASTAELIST.Len() {
+		t.Errorf("Size mismatch")
+	}
+	data, ok := PASTAEMAP[id1]
 	if ok {
 		t.Errorf("Cache clearing failed")
 	}
-	data, ok = pastaeMap[id2]
+	data, ok = PASTAEMAP[id2]
 	if ok {
 		t.Errorf("Cache clearing failed")
 	}
-	data, ok = pastaeMap[id3]
+	data, ok = PASTAEMAP[id3]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
-	data, ok = pastaeMap[id4]
+	data, ok = PASTAEMAP[id4]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -59,17 +70,17 @@ func TestLRUCache(t *testing.T) {
 }
 
 func TestInsertPaste(t *testing.T) {
-	pastaeMap = make(map[string]Pastae)
-	pastaeList = list.New()
+	PASTAEMAP = make(map[string]Pastae)
+	PASTAELIST = list.New()
 	paste := []byte("Trololoo")
 	contentType := "wolo/daaddaaaa"
-	kekT, error := generateRandomBytes(16)
-	if error != nil {
+	var err error
+	KEK, err = generateRandomBytes(16)
+	if err != nil {
 		return
 	}
-	kek = kekT
 	id := insertPaste(paste, false, contentType)
-	data, ok := pastaeMap[id]
+	data, ok := PASTAEMAP[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -97,17 +108,17 @@ func TestInsertPastaes(t *testing.T) {
 }
 
 func TestInsertPasteBurnAfterReading(t *testing.T) {
-	pastaeMap = make(map[string]Pastae)
-	pastaeList = list.New()
+	PASTAEMAP = make(map[string]Pastae)
+	PASTAELIST = list.New()
 	paste := []byte("Wololo")
 	contentType := "trolo/daadda"
-	kekT, error := generateRandomBytes(16)
-	if error != nil {
+	var err error
+	KEK, err = generateRandomBytes(16)
+	if err != nil {
 		return
 	}
-	kek = kekT
 	id := insertPaste(paste, true, contentType)
-	data, ok := pastaeMap[id]
+	data, ok := PASTAEMAP[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -118,7 +129,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
-	data, ok = pastaeMap[id]
+	data, ok = PASTAEMAP[id]
 	if ok {
 		t.Errorf("Paste not burned after fetching")
 	}
@@ -132,37 +143,39 @@ func TestInsertPastaesBurnAfterReading(t *testing.T) {
 }
 
 func TestSessionCleaning(t *testing.T) {
-	sessions = make(map[string]Session)
+	SESSIONS = make(map[string]Session)
 	var session Session
 	session.UserID = 765
 	session.Created = time.Now().Unix() - 100500100500
-	sessions["expired"] = session
+	SESSIONS["expired"] = session
 	var session2 Session
 	session2.UserID = 3124
 	session2.Created = time.Now().Unix() + 100500100500
-	sessions["valid"] = session2
+	SESSIONS["valid"] = session2
 	cleanSessions()
-	_, ok := sessions["expired"]
+	_, ok := SESSIONS["expired"]
 	if ok {
 		t.Errorf("Expired session not cleaned")
 	}
-	_, ok = sessions["valid"]
+	_, ok = SESSIONS["valid"]
 	if !ok {
 		t.Errorf("Valid session cleaned")
 	}
 }
 
 func TestSessionValidation(t *testing.T) {
-	var session Session
-	session.UserID = 100500
-	session.Created = time.Now().Unix()
-	sessions["sess"] = session
-	id, _ := sessionValid("sess")
-	if id < 0 {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	defer db.Close()
+	SESSIONS["sess"] = Session{UserID: 100500, Created: time.Now().Unix()}
+	id, _, err := sessionValid(db, "sess")
+	if id < 0 || err != nil {
 		t.Errorf("Valid session deemed invalid")
 	}
-	id, _ = sessionValid("invalid")
-	if id >= 0 {
+	id, _, err = sessionValid(db, "invalid")
+	if id >= 0 || err == nil {
 		t.Errorf("Invalid session deemed valid")
 	}
 }
@@ -171,10 +184,118 @@ func TestSessionCreationTimeUpdate(t *testing.T) {
 	var session Session
 	session.UserID = 100500
 	session.Created = time.Now().Unix() - 1000
-	sessions["update"] = session
+	SESSIONS["update"] = session
 	updateSessionCreationTime("update")
-	updated := sessions["update"]
+	updated := SESSIONS["update"]
 	if updated.Created < time.Now().Unix() {
 		t.Errorf("Session creation time not updated")
+	}
+}
+
+func TestCreateDbTablesAndIndexes(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	defer db.Close()
+	CONFIGURATION.DatabasePersistUser = "TestUser"
+	err = createDbTablesAndIndexes(db)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+}
+
+func TestSessionValidWithPersistUser(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	defer db.Close()
+	CONFIGURATION.DatabasePersistUser = "TestUser"
+	err = createDbTablesAndIndexes(db)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	sid, _, err := sessionValid(db, "")
+	if sid < 0 || err != nil {
+		t.Errorf("Persist session not accepted")
+	}
+	sid, _, err = sessionValid(db, "Invalid")
+	if sid >= 0 || err == nil {
+		t.Errorf("Invalid session accepted")
+	}
+}
+
+func TestRegisterUser(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	defer db.Close()
+	CONFIGURATION.DatabasePersistUser = ""
+	err = createDbTablesAndIndexes(db)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	user := "UseNameAhto"
+	err = registerUser(db, user)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	err = registerUser(db, user)
+	if err == nil {
+		t.Errorf("Duplicate user accepted")
+	}
+}
+
+func TestSessionValid(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	defer db.Close()
+	CONFIGURATION.DatabasePersistUser = ""
+	CONFIGURATION.DatabaseTimeout = 36000
+	err = createDbTablesAndIndexes(db)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	user := "UserSima"
+	err = registerUser(db, user)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	cleanSessions()
+	SESSIONS["bond"] = Session{Created: time.Now().Unix(), Kek: []byte("license to kill"), UserID: 7}
+	_, _, err = sessionValid(db, "bond")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	cleanSessions()
+	_, _, err = sessionValid(db, "bond")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	_, _, err = sessionValid(db, "")
+	if err == nil {
+		t.Errorf("Invalid session ID accepted")
+	}
+	_, _, err = sessionValid(db, "bondi")
+	if err == nil {
+		t.Errorf("Invalid session ID accepted")
+	}
+
+	SESSIONS["Q"] = Session{Created: time.Now().Unix() - 36020, Kek: []byte("Q"), UserID: 10}
+	cleanSessions()
+	_, _, err = sessionValid(db, "Q")
+	if err == nil {
+		t.Errorf("Expired session accepted")
+	}
+	_, _, err = sessionValid(db, "bond")
+	if err != nil {
+		t.Errorf(err.Error())
 	}
 }

@@ -3,10 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"image"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -34,9 +32,9 @@ func uploadPasteS(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	var maxEntrySize int64
 	if session {
-		maxEntrySize = configuration.SessionMaxEntrySize
+		maxEntrySize = CONFIGURATION.DatabaseMaxEntrySize
 	} else {
-		maxEntrySize = configuration.MaxEntrySize
+		maxEntrySize = CONFIGURATION.MaxEntrySize
 	}
 	err := r.ParseMultipartForm(maxEntrySize)
 	if err != nil {
@@ -44,26 +42,24 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		log.Println("MultiPart parsing")
 		return
 	}
-	var uid int64 = 0
 	var expire int64 = 0
+	var uid int64 = 0
 	var ukek []byte
 	if session {
-		uid, ukek = sessionValid(r.Header.Get("pastae-sessid"))
-		if uid < 0 {
+		uidt, ukekt, err := sessionValid(DB, r.Header.Get("pastae-sessid"))
+		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		uid = uidt
+		ukek = ukekt
 		if r.FormValue("expire") == "30" {
 			expire = time.Now().Unix() + 30*24*60*60
 		}
-		var pcount int64
-		sessionPasteCountMutex.RLock()
-		pcount = sessionPasteCount
-		sessionPasteCountMutex.RUnlock()
-		if pcount >= configuration.SessionMaxEntries {
+		if SESSIONPASTECOUNT.Load() >= CONFIGURATION.DatabaseMaxEntries {
 			go func() {
 				var fname string
-				err = db.QueryRow("DELETE FROM data WHERE id =" +
+				err = DB.QueryRow("DELETE FROM data WHERE id =" +
 					"(SELECT id FROM data ORDER BY id LIMIT 1) RETURNING fname").Scan(&fname)
 				if err != nil {
 					log.Println(err)
@@ -72,7 +68,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 					log.Println("empty file name")
 					return
 				}
-				err = os.Remove(configuration.SessionPath + fname)
+				err = os.Remove(CONFIGURATION.DataPath + fname)
 				if err != nil {
 					log.Println(err)
 				}
@@ -89,9 +85,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 				id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
 			} else {
 				id = insertPasteToFile([]byte(r.FormValue("data")), contentType, uid, expire, ukek)
-				sessionPasteCountMutex.Lock()
-				sessionPasteCount++
-				sessionPasteCountMutex.Unlock()
+				SESSIONPASTECOUNT.Add(1)
 			}
 		} else {
 			id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
@@ -106,18 +100,17 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		return
 	}
 	file, header, err := r.FormFile("file")
-	var format string
 	if err != nil || header.Size > maxEntrySize {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data, err := ioutil.ReadAll(io.LimitReader(file, maxEntrySize))
+	data, err := io.ReadAll(io.LimitReader(file, (int64)(maxEntrySize)))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Println("Reading file")
 		return
 	}
-	_, format, err = image.Decode(bytes.NewReader(data))
+	_, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Println(err)
@@ -130,9 +123,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 			id = insertPaste(data, bar, contentType)
 		} else {
 			id = insertPasteToFile(data, contentType, uid, expire, ukek)
-			sessionPasteCountMutex.Lock()
-			sessionPasteCount++
-			sessionPasteCountMutex.Unlock()
+			SESSIONPASTECOUNT.Add(1)
 		}
 	} else {
 		id = insertPaste(data, bar, contentType)
@@ -148,35 +139,29 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 }
 
 func insertPaste(pasteData []byte, bar bool, contentType string) string {
-	pastaeMutex.Lock()
-	if len(pastaeMap) >= configuration.MaxEntries {
-		if pastaeList.Len() > 0 {
-			delete(pastaeMap, pastaeList.Front().Value.(Pastae).Id)
-			pastaeList.Remove(pastaeList.Front())
+	PASTAEMUTEX.Lock()
+	defer PASTAEMUTEX.Unlock()
+	if len(PASTAEMAP) >= CONFIGURATION.MaxEntries {
+		if PASTAELIST.Len() > 0 {
+			delete(PASTAEMAP, PASTAELIST.Front().Value.(Pastae).Id)
+			PASTAELIST.Remove(PASTAELIST.Front())
 		}
 	}
-	pastaeMutex.Unlock()
-	var paste Pastae
-	paste.BurnAfterReading = bar
 	nonce, error := generateRandomBytes(12)
 	if error != nil {
-		return "ERROR"
+		return error.Error()
 	}
 	key, error := generateRandomBytes(16)
 	if error != nil {
-		return "ERROR"
+		return error.Error()
 	}
-	paste.ContentType = contentType
-	paste.Nonce = nonce
-	paste.Key = key
-	pasteData, error = encryptData(pasteData, key, nonce, kek)
+	pasteData, error = encryptData(pasteData, key, nonce, KEK)
 	if error != nil {
-		return "ERROR"
+		return error.Error()
 	}
-	paste.Payload = pasteData
 	rnd, error := generateRandomBytes(12)
 	if error != nil {
-		return "ERROR"
+		return error.Error()
 	}
 	id := hex.EncodeToString(rnd)
 	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
@@ -185,19 +170,17 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 		ct := strings.Split(contentType, "/")
 		id += "." + ct[1]
 	}
-	paste.Id = id
-	pastaeMutex.Lock()
-	pastaeMap[id] = paste
-	pastaeList.PushBack(paste)
-	pastaeMutex.Unlock()
-	return configuration.URL + id
+	paste := Pastae{Id: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
+	PASTAEMAP[id] = paste
+	PASTAELIST.PushBack(paste)
+	return CONFIGURATION.URL + id
 }
 
 func insertPasteToFile(pasteData []byte,
 	contentType string, uid int64, expire int64, ukek []byte) string {
-	rnd, error := generateRandomBytes(12)
-	if error != nil {
-		return "ERROR"
+	rnd, err := generateRandomBytes(12)
+	if err != nil {
+		return err.Error()
 	}
 	id := hex.EncodeToString(rnd)
 	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
@@ -206,21 +189,21 @@ func insertPasteToFile(pasteData []byte,
 		ct := strings.Split(contentType, "/")
 		id += "." + ct[1]
 	}
-	rnd, error = generateRandomBytes(12)
-	if error != nil {
-		return "ERROR"
+	rnd, err = generateRandomBytes(12)
+	if err != nil {
+		return err.Error()
 	}
 	fileName := hex.EncodeToString(rnd)
 	if fileName == "" {
-		return "ERROR"
+		return "Empty file name"
 	}
-	nonce, error := generateRandomBytes(12)
-	if error != nil {
-		return "ERROR"
+	nonce, err := generateRandomBytes(12)
+	if err != nil {
+		return err.Error()
 	}
-	key, error := generateRandomBytes(16)
-	if error != nil {
-		return "ERROR"
+	key, err := generateRandomBytes(16)
+	if err != nil {
+		return err.Error()
 	}
 	var dbStatus string
 	var fileStatus string
@@ -231,7 +214,7 @@ func insertPasteToFile(pasteData []byte,
 		if expire == 0 {
 			qs := "INSERT INTO data (uid, pid, fname, key, nonce, ct)" +
 				"VALUES ($1, $2, $3, $4, $5, $6)"
-			_, err := db.Exec(qs, uid, id, fileName, key, nonce, contentType)
+			_, err := DB.Exec(qs, uid, id, fileName, key, nonce, contentType)
 			if err != nil {
 				*dbStatus = "ERROR"
 				return
@@ -240,7 +223,7 @@ func insertPasteToFile(pasteData []byte,
 		} else {
 			qs := "INSERT INTO data (uid, pid, fname, key, nonce, ct, expire)" +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7)"
-			_, err := db.Exec(qs, uid, id, fileName, key, nonce, contentType, expire)
+			_, err := DB.Exec(qs, uid, id, fileName, key, nonce, contentType, expire)
 			if err != nil {
 				*dbStatus = "ERROR"
 				return
@@ -251,14 +234,14 @@ func insertPasteToFile(pasteData []byte,
 	wg.Add(1)
 	go func(pasteData []byte, fileName string, key []byte, nonce []byte, ukek []byte, fileStatus *string) {
 		defer wg.Done()
-		pasteData, error = encryptData(pasteData, key, nonce, ukek)
-		if error != nil {
-			*fileStatus = "ERROR"
+		pasteData, err = encryptData(pasteData, key, nonce, ukek)
+		if err != nil {
+			*fileStatus = err.Error()
 			return
 		}
-		err := ioutil.WriteFile(configuration.SessionPath+fileName, pasteData, 0644)
+		err := os.WriteFile(CONFIGURATION.DataPath+fileName, pasteData, 0644)
 		if err != nil {
-			*fileStatus = "ERROR"
+			*fileStatus = err.Error()
 			return
 		}
 		*fileStatus = "OK"
@@ -267,7 +250,7 @@ func insertPasteToFile(pasteData []byte,
 	if fileStatus != dbStatus || fileStatus != "OK" {
 		return "ERROR"
 	}
-	return configuration.URL + id
+	return CONFIGURATION.URL + id
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -276,43 +259,38 @@ func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	uid, _ := sessionValid(sessid)
-	if uid < 0 {
+	_, _, err := sessionValid(DB, sessid)
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	go func(pid string) {
 		var fname string
-		err := db.QueryRow("DELETE FROM data WHERE pid = $1 RETURNING fname", pid).Scan(&fname)
+		err := DB.QueryRow("DELETE FROM data WHERE pid = $1 RETURNING fname", pid).Scan(&fname)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		if fname == "" {
 			log.Println("empty file name")
-			sessionPasteCountMutex.Lock()
-			sessionPasteCount--
-			sessionPasteCountMutex.Unlock()
+			SESSIONPASTECOUNT.Add(-1)
 			return
 		}
-		err = os.Remove(configuration.SessionPath + fname)
+		err = os.Remove(CONFIGURATION.DataPath + fname)
 		if err != nil {
 			log.Println(err)
 		}
-		sessionPasteCountMutex.Lock()
-		sessionPasteCount--
-		sessionPasteCountMutex.Unlock()
+		SESSIONPASTECOUNT.Add(-1)
 	}(p.ByName("id"))
 }
 
 func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, error) {
 	sum := kdf(key, kek)
-	var error error
-	payload, error = encrypt(payload, sum[0:16], nonce)
-	if error != nil {
+	payload, err := encrypt(payload, sum[0:16], nonce)
+	if err != nil {
 		go zeroByteArray(sum, 32)
-		return nil, errors.New("ERROR")
+		return nil, err
 	}
 	go zeroByteArray(sum, 32)
 	return payload, nil

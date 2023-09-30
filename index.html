@@ -91,11 +91,6 @@ legend.sansserif {
     <legend class="sansserif">Upload paste</legend>
     <textarea form="paste" id="text-paste-data" name="data" autocomplete="off" rows="15" cols="80" required></textarea>
     <input type="hidden" name="content-type" value="text/plain">
-    <p>
-      <button class="button" type="button" onclick="pasteFromClipboard()">
-        Paste from clipboard
-      </button>
-    </p>
     <p class="sansserif">
         <label>
           <input type="checkbox" id="paste-bar" name="bar" value="bar">
@@ -137,7 +132,7 @@ legend.sansserif {
       <label for="password-login">Password:</label><br>
       <input type="password" name="password-login" id="password-login" class="text" required>
       </p>
-      <p><button onclick="logIn()" class="button">Log in</button></p>
+      <p><button onclick="logIn()" class="button" id="login-button">Log in</button></p>
     </fieldset>
   </div>
 </div>
@@ -154,7 +149,7 @@ legend.sansserif {
     <label for="password-register">Password:</label><br>
     <input type="password" name="password-register" id="password-register" class="text" required>
     </p>
-    <p><button onclick="register()" class="button">Register</button></p>
+    <p><button onclick="register()" class="button" id="register-button">Register</button></p>
   </fieldset>
 </div>
 </div>
@@ -164,6 +159,12 @@ legend.sansserif {
 </div>
 
 <script>
+    document.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+      }
+    });
+
   const keepAliveMs = 60000;
   let sessid = undefined;
   let defaultStateCaptured = false;
@@ -171,12 +172,12 @@ legend.sansserif {
   let defaultText;
   let defaultLogin;
   let defaultRegister;
-
+    
   async function keepAlive() {
     if(sessid === undefined) {
       return;
     }
-    let response = await fetch("/session/ping", {
+    await fetch("/session/ping", {
         method: "POST",
         body: "",
         headers: {
@@ -202,7 +203,7 @@ legend.sansserif {
     const message2 = document.getElementById("password-login").value;
     const hash = await computeHash(message1, message2);
 
-    let response = await fetch("/session/login", {
+    const response = await fetch("/session/login", {
       method: "POST",
       body: btoa(String.fromCharCode(...new Uint8Array(hash)))
     });
@@ -228,13 +229,13 @@ legend.sansserif {
     const message2 = document.getElementById("password-register").value;
     const hash = await computeHash(message1, message2);
 
-    let response = await fetch('/session/register', {
+    const response = await fetch('/session/register', {
       method: 'POST',
       body: btoa(String.fromCharCode(...new Uint8Array(hash)))
     });
 
     if(response.ok) {
-      let result = await response.text();
+      const result = await response.text();
       document.getElementById('banner').innerHTML =
         "<p class=\"sansserif\">Registered user " + message1 +"</p>";
       document.getElementById('register').innerHTML = "";
@@ -247,7 +248,7 @@ legend.sansserif {
   async function listPastes() {
     let originalHTML = document.getElementById("login").innerHTML;
     document.getElementById("login").innerHTML = "<div class=\"loader\"></div>";
-    let response = await fetch("/session/list", {
+    const response = await fetch("/session/list", {
         method: "POST",
         body: "",
         headers: {
@@ -278,7 +279,7 @@ legend.sansserif {
 
   async function logOut() {
     if(sessid !== undefined) {
-      let response = await fetch('/session/logout', {
+      const response = await fetch('/session/logout', {
       method: 'POST',
       body: sessid
       });
@@ -342,8 +343,7 @@ legend.sansserif {
       status = document.getElementById("status");
     }
     if(response.ok) {
-      let result = await response.text();
-      status.innerHTML = result;
+      status.innerHTML = await response.text();
       if(sessid !== undefined) {
         await listPastes();
       }
@@ -388,8 +388,7 @@ legend.sansserif {
       status = document.getElementById("status");
     }
     if(response.ok) {
-      let result = await response.text();
-      status.innerHTML = result;
+      status.innerHTML = await response.text();
       if(sessid !== undefined) {
         await listPastes();
       }
@@ -404,7 +403,7 @@ legend.sansserif {
     if(sessid === undefined || sessid === null) {
       return;
     }
-    let response = await fetch("/" + id, {
+    const response = await fetch("/" + id, {
       method: "DELETE",
       body: "",
       headers: {

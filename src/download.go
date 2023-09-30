@@ -1,19 +1,18 @@
 package main
 
 import (
-	"errors"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/julienschmidt/httprouter"
 )
 
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
-	pastaeMutex.RLock()
-	data, ok := pastaeMap[id]
-	pastaeMutex.RUnlock()
+	PASTAEMUTEX.RLock()
+	data, ok := PASTAEMAP[id]
+	PASTAEMUTEX.RUnlock()
 	if ok {
 		resp, error := fetchPaste(data)
 		if error != nil {
@@ -22,7 +21,7 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		w.Header().Set("content-type", data.ContentType)
 		w.Write(resp)
-		go zeroByteArray(resp, len(resp))
+		zeroByteArray(resp, len(resp))
 	} else {
 		http.NotFound(w, r)
 	}
@@ -30,18 +29,18 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
-	pastaeMutex.RLock()
-	data, ok := pastaeMap[id]
-	pastaeMutex.RUnlock()
+	PASTAEMUTEX.RLock()
+	data, ok := PASTAEMAP[id]
+	PASTAEMUTEX.RUnlock()
 	if ok {
-		resp, error := fetchPaste(data)
-		if error != nil {
+		resp, err := fetchPaste(data)
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("content-type", data.ContentType)
 		w.Write(resp)
-		go zeroByteArray(resp, len(resp))
+		zeroByteArray(resp, len(resp))
 	} else {
 		var fname string
 		var key []byte
@@ -49,24 +48,24 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		var uid int64
 		var contentType string
 		var ukek []byte
-		error := db.QueryRow("SELECT fname,key,nonce,uid,ct,kek FROM data,users "+
-			"WHERE pid=$1 AND users.id=data.uid", id).Scan(&fname, &key, &nonce, &uid, &contentType, &ukek)
-		if error != nil {
+		const qs = "SELECT fname,key,nonce,uid,ct,kek FROM data,users WHERE pid=$1 AND users.id=data.uid"
+		err := DB.QueryRow(qs, id).Scan(&fname, &key, &nonce, &uid, &contentType, &ukek)
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
 		var file []byte
-		file, error = ioutil.ReadFile(configuration.SessionPath + fname)
-		if error != nil {
-			log.Println(error)
+		file, err = os.ReadFile(CONFIGURATION.DataPath + fname)
+		if err != nil {
+			log.Println(err)
 			http.NotFound(w, r)
 			return
 		}
 		sum := kdf(key, ukek)
-		file, error = decrypt(file, sum[0:16], nonce)
+		file, err = decrypt(file, sum[0:16], nonce)
 		go zeroByteArray(sum, 32)
-		if error != nil {
-			log.Println(error)
+		if err != nil {
+			log.Println(err)
 			http.NotFound(w, r)
 			return
 		}
@@ -77,24 +76,24 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func fetchPaste(pasta Pastae) ([]byte, error) {
-	resp, error := decryptPaste(pasta)
-	if error != nil {
-		return []byte("ERROR"), errors.New("Error fetching paste")
+	resp, err := decryptPaste(pasta)
+	if err != nil {
+		return []byte("ERROR"), err
 	}
 	if pasta.BurnAfterReading {
-		pastaeMutex.Lock()
-		delete(pastaeMap, pastaeList.Front().Value.(Pastae).Id)
-		pastaeList.Remove(pastaeList.Front())
-		pastaeMutex.Unlock()
+		PASTAEMUTEX.Lock()
+		defer PASTAEMUTEX.Unlock()
+		delete(PASTAEMAP, PASTAELIST.Front().Value.(Pastae).Id)
+		PASTAELIST.Remove(PASTAELIST.Front())
 	}
 	return resp, nil
 }
 
 func decryptPaste(paste Pastae) ([]byte, error) {
-	sum := kdf(paste.Key, kek)
-	data, error := decrypt(paste.Payload, sum[0:16], paste.Nonce)
-	if error != nil {
-		return []byte(""), error
+	sum := kdf(paste.Key, KEK)
+	data, err := decrypt(paste.Payload, sum[0:16], paste.Nonce)
+	if err != nil {
+		return []byte(""), err
 	}
 	go zeroByteArray(sum, 32)
 	return data, nil
