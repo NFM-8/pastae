@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -76,6 +77,9 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func fetchPaste(pasta Pastae) ([]byte, error) {
+	if PASTAELIST == nil {
+		return []byte(""), errors.New("PASTAELIST is nil")
+	}
 	resp, err := decryptPaste(pasta)
 	if err != nil {
 		return []byte("ERROR"), err

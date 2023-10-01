@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"image"
 	"io"
 	"log"
@@ -82,13 +83,28 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		var id string
 		if session {
 			if bar {
-				id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
+				id, err = insertPaste([]byte(r.FormValue("data")), bar, contentType)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					log.Println(err)
+					return
+				}
 			} else {
-				id = insertPasteToFile([]byte(r.FormValue("data")), contentType, uid, expire, ukek)
+				id, err = insertPasteToFile([]byte(r.FormValue("data")), contentType, uid, expire, ukek)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					log.Println(err)
+					return
+				}
 				SESSIONPASTECOUNT.Add(1)
 			}
 		} else {
-			id = insertPaste([]byte(r.FormValue("data")), bar, contentType)
+			id, err = insertPaste([]byte(r.FormValue("data")), bar, contentType)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Println(err)
+				return
+			}
 		}
 		if err := r.Body.Close(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -120,13 +136,28 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	var id string
 	if session {
 		if bar {
-			id = insertPaste(data, bar, contentType)
+			id, err = insertPaste(data, bar, contentType)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Println(err)
+				return
+			}
 		} else {
-			id = insertPasteToFile(data, contentType, uid, expire, ukek)
+			id, err = insertPasteToFile(data, contentType, uid, expire, ukek)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Println(err)
+				return
+			}
 			SESSIONPASTECOUNT.Add(1)
 		}
 	} else {
-		id = insertPaste(data, bar, contentType)
+		id, err = insertPaste(data, bar, contentType)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
 	}
 	if err := r.Body.Close(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -138,7 +169,10 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	return
 }
 
-func insertPaste(pasteData []byte, bar bool, contentType string) string {
+func insertPaste(pasteData []byte, bar bool, contentType string) (string, error) {
+	if PASTAELIST == nil {
+		return "", errors.New("PASTAELIST is nil")
+	}
 	PASTAEMUTEX.Lock()
 	defer PASTAEMUTEX.Unlock()
 	if len(PASTAEMAP) >= CONFIGURATION.MaxEntries {
@@ -147,21 +181,21 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 			PASTAELIST.Remove(PASTAELIST.Front())
 		}
 	}
-	nonce, error := generateRandomBytes(12)
-	if error != nil {
-		return error.Error()
+	nonce, err := generateRandomBytes(12)
+	if err != nil {
+		return err.Error(), err
 	}
 	key, error := generateRandomBytes(16)
 	if error != nil {
-		return error.Error()
+		return err.Error(), err
 	}
 	pasteData, error = encryptData(pasteData, key, nonce, KEK)
 	if error != nil {
-		return error.Error()
+		return err.Error(), err
 	}
 	rnd, error := generateRandomBytes(12)
 	if error != nil {
-		return error.Error()
+		return err.Error(), err
 	}
 	id := hex.EncodeToString(rnd)
 	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
@@ -173,14 +207,14 @@ func insertPaste(pasteData []byte, bar bool, contentType string) string {
 	paste := Pastae{Id: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
 	PASTAEMAP[id] = paste
 	PASTAELIST.PushBack(paste)
-	return CONFIGURATION.URL + id
+	return CONFIGURATION.URL + id, nil
 }
 
 func insertPasteToFile(pasteData []byte,
-	contentType string, uid int64, expire int64, ukek []byte) string {
+	contentType string, uid int64, expire int64, ukek []byte) (string, error) {
 	rnd, err := generateRandomBytes(12)
 	if err != nil {
-		return err.Error()
+		return err.Error(), err
 	}
 	id := hex.EncodeToString(rnd)
 	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
@@ -191,19 +225,19 @@ func insertPasteToFile(pasteData []byte,
 	}
 	rnd, err = generateRandomBytes(12)
 	if err != nil {
-		return err.Error()
+		return err.Error(), err
 	}
 	fileName := hex.EncodeToString(rnd)
 	if fileName == "" {
-		return "Empty file name"
+		return "Empty file name", errors.New("Empty file name")
 	}
 	nonce, err := generateRandomBytes(12)
 	if err != nil {
-		return err.Error()
+		return err.Error(), err
 	}
 	key, err := generateRandomBytes(16)
 	if err != nil {
-		return err.Error()
+		return err.Error(), err
 	}
 	var dbStatus string
 	var fileStatus string
@@ -248,9 +282,9 @@ func insertPasteToFile(pasteData []byte,
 	}(pasteData, fileName, key, nonce, ukek, &fileStatus)
 	wg.Wait()
 	if fileStatus != dbStatus || fileStatus != "OK" {
-		return "ERROR"
+		return "ERROR", errors.New("ERROR")
 	}
-	return CONFIGURATION.URL + id
+	return CONFIGURATION.URL + id, nil
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {

@@ -21,20 +21,20 @@ func TestLRUCache(t *testing.T) {
 	if len(PASTAEMAP) != PASTAELIST.Len() {
 		t.Errorf("Size mismatch")
 	}
-	id1 := insertPaste(paste, false, contentType)
-	if len(PASTAEMAP) != PASTAELIST.Len() {
+	id1, err := insertPaste(paste, false, contentType)
+	if err != nil || len(PASTAEMAP) != PASTAELIST.Len() {
 		t.Errorf("Size mismatch")
 	}
-	id2 := insertPaste(paste, false, contentType)
-	if len(PASTAEMAP) != PASTAELIST.Len() {
+	id2, err := insertPaste(paste, false, contentType)
+	if err != nil || len(PASTAEMAP) != PASTAELIST.Len() {
 		t.Errorf("Size mismatch")
 	}
-	id3 := insertPaste(paste, false, contentType)
-	if len(PASTAEMAP) != PASTAELIST.Len() {
+	id3, err := insertPaste(paste, false, contentType)
+	if err != nil || len(PASTAEMAP) != PASTAELIST.Len() {
 		t.Errorf("Size mismatch")
 	}
-	id4 := insertPaste(paste, false, contentType)
-	if len(PASTAEMAP) != PASTAELIST.Len() {
+	id4, err := insertPaste(paste, false, contentType)
+	if err != nil || len(PASTAEMAP) != PASTAELIST.Len() {
 		t.Errorf("Size mismatch")
 	}
 	data, ok := PASTAEMAP[id1]
@@ -79,7 +79,10 @@ func TestInsertPaste(t *testing.T) {
 	if err != nil {
 		return
 	}
-	id := insertPaste(paste, false, contentType)
+	id, err := insertPaste(paste, false, contentType)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 	data, ok := PASTAEMAP[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
@@ -117,7 +120,10 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if err != nil {
 		return
 	}
-	id := insertPaste(paste, true, contentType)
+	id, err := insertPaste(paste, true, contentType)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 	data, ok := PASTAEMAP[id]
 	if !ok {
 		t.Errorf("Map lookup failed")
