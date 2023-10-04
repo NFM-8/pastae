@@ -64,6 +64,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 					"(SELECT id FROM data ORDER BY id LIMIT 1) RETURNING fname").Scan(&fname)
 				if err != nil {
 					log.Println(err)
+					return
 				}
 				if fname == "" {
 					log.Println("empty file name")
@@ -323,9 +324,9 @@ func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, 
 	sum := kdf(key, kek)
 	payload, err := encrypt(payload, sum[0:16], nonce)
 	if err != nil {
-		go zeroByteArray(sum, 32)
+		zeroByteArray(sum, 32)
 		return nil, err
 	}
-	go zeroByteArray(sum, 32)
+	zeroByteArray(sum, 32)
 	return payload, nil
 }

@@ -2,16 +2,20 @@ package main
 
 import (
 	"container/list"
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -64,8 +68,12 @@ var SESSIONPASTECOUNT atomic.Int64
 var KEK []byte
 var FRONTPAGE []byte
 var DB *sql.DB
+var STOP chan bool
+var STOPPED chan int
 
 func main() {
+	STOP <- false
+	STOPPED <- 0
 	err := readConfig("pastae.json")
 	if err != nil {
 		log.Fatal(err)
@@ -76,9 +84,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	pasteServer := servePaste
-	uploadServer := uploadPaste
 	if CONFIGURATION.Database {
 		if _, err := os.Stat(CONFIGURATION.DataPath); os.IsNotExist(err) {
 			log.Fatal("SessionPath (" + CONFIGURATION.DataPath + ") does not exist")
@@ -87,6 +92,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		defer DB.Close()
 		err = DB.Ping()
 		if err != nil {
 			log.Fatal(err)
@@ -96,10 +102,6 @@ func main() {
 			log.Fatal(err)
 		}
 		SESSIONS = make(map[string]Session)
-		go sessionCleaner(time.Minute)
-		go expiredCleaner(DB, time.Minute)
-		pasteServer = servePasteS
-		uploadServer = uploadPasteS
 		l := len(CONFIGURATION.DataPath)
 		if l > 0 {
 			if CONFIGURATION.DataPath[l-1] != '/' {
@@ -116,8 +118,13 @@ func main() {
 
 	mux := httprouter.New()
 	mux.GET("/", serveFrontPage)
-	mux.GET("/:id", pasteServer)
-	mux.POST("/upload", uploadServer)
+	if CONFIGURATION.Database {
+		mux.GET("/:id", servePasteS)
+		mux.POST("/upload", uploadPasteS)
+	} else {
+		mux.GET("/:id", servePaste)
+		mux.POST("/upload", uploadPaste)
+	}
 	if CONFIGURATION.Database {
 		mux.POST("/session/list", pasteList)
 		mux.POST("/session/register", registerUserHandler)
@@ -136,10 +143,30 @@ func main() {
 		WriteTimeout:   CONFIGURATION.WriteTimeout * time.Second,
 		MaxHeaderBytes: CONFIGURATION.MaxHeaderBytes,
 	}
-	if CONFIGURATION.TLS {
-		log.Fatal(s.ListenAndServeTLS(CONFIGURATION.TLSCert, CONFIGURATION.TLSKey))
-	} else {
-		log.Fatal(s.ListenAndServe())
+	go sessionCleaner(time.Minute, STOP, STOPPED)
+	go expiredCleaner(DB, time.Minute, STOP, STOPPED)
+	go func() {
+		if CONFIGURATION.TLS {
+			err = s.ListenAndServeTLS(CONFIGURATION.TLSCert, CONFIGURATION.TLSKey)
+		} else {
+			err = s.ListenAndServe()
+		}
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Println(err)
+		}
+	}()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	<-c
+	STOP <- true
+	for <-STOPPED < 2 {
+		time.Sleep(time.Millisecond)
+	}
+	ctx, close := context.WithTimeout(context.Background(), 10*time.Second)
+	defer close()
+	err = s.Shutdown(ctx)
+	if err != nil {
+		log.Fatal(err)
 	}
 	return
 }
