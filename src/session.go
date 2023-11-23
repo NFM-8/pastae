@@ -19,12 +19,8 @@ type Session struct {
 	Created int64
 }
 
-func sessionCleaner(sleepTime time.Duration, stop chan bool, stopped chan int) {
+func sessionCleaner(sleepTime time.Duration) {
 	for {
-		if <-stop {
-			stopped <- <-stopped + 1
-			return
-		}
 		time.Sleep(sleepTime)
 		cleanSessions()
 	}
@@ -45,16 +41,11 @@ func cleanSessions() {
 	}
 }
 
-func expiredCleaner(db *sql.DB, sleepTime time.Duration, stop chan bool, stopped chan int) {
+func expiredCleaner(db *sql.DB, sleepTime time.Duration) {
 	if db == nil {
-		stopped <- <-stopped + 1
 		return
 	}
 	for {
-		if <-stop {
-			stopped <- <-stopped + 1
-			return
-		}
 		time.Sleep(sleepTime)
 		cleanExpired(db)
 	}
