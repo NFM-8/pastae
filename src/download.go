@@ -64,7 +64,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		sum := kdf(key, ukek)
 		file, err = decrypt(file, sum[0:16], nonce)
-		go zeroByteArray(sum, 32)
+		zeroByteArray(sum, 32)
 		if err != nil {
 			log.Println(err)
 			http.NotFound(w, r)
@@ -72,7 +72,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		w.Header().Set("content-type", contentType)
 		w.Write(file)
-		go zeroByteArray(file, len(file))
+		zeroByteArray(file, len(file))
 	}
 }
 
@@ -99,6 +99,6 @@ func decryptPaste(paste Pastae) ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
-	go zeroByteArray(sum, 32)
+	zeroByteArray(sum, 32)
 	return data, nil
 }

@@ -31,7 +31,7 @@ func uploadPasteS(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
-	var maxEntrySize int64
+	var maxEntrySize int64 = 0
 	if session {
 		maxEntrySize = CONFIGURATION.DatabaseMaxEntrySize
 	} else {
@@ -198,7 +198,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) (string, error)
 		return err.Error(), err
 	}
 	id := hex.EncodeToString(rnd)
-	if contentType == "text/plain" || contentType == "text/plain;charset=utf-8" {
+	if strings.HasPrefix(contentType, "text/plain") {
 		id += ".txt"
 	} else {
 		ct := strings.Split(contentType, "/")
@@ -323,9 +323,9 @@ func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, 
 	sum := kdf(key, kek)
 	payload, err := encrypt(payload, sum[0:16], nonce)
 	if err != nil {
-		go zeroByteArray(sum, 32)
+		zeroByteArray(sum, 32)
 		return nil, err
 	}
-	go zeroByteArray(sum, 32)
+	zeroByteArray(sum, 32)
 	return payload, nil
 }
