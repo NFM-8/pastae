@@ -57,11 +57,12 @@ func cleanExpired(db *sql.DB) {
 	}
 	r, err := db.Query("DELETE FROM data WHERE expire IS NOT NULL AND expire <= $1 RETURNING fname",
 		time.Now().Unix())
-	defer r.Close()
 	if err != nil {
+		r.Close()
 		log.Println(err)
 		return
 	}
+	defer r.Close()
 	for r.Next() {
 		var fname string
 		err = r.Scan(&fname)
@@ -104,7 +105,7 @@ func sessionValid(db *sql.DB, token string) (int64, []byte, error) {
 
 func registerUser(db *sql.DB, hash string) error {
 	if len(hash) == 0 {
-		return errors.New("Empty hash")
+		return errors.New("empty hash")
 	}
 	kek, err := generateRandomBytes(64)
 	if err != nil {

@@ -166,7 +166,6 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(id))
-	return
 }
 
 func insertPaste(pasteData []byte, bar bool, contentType string) (string, error) {
@@ -229,7 +228,7 @@ func insertPasteToFile(pasteData []byte,
 	}
 	fileName := hex.EncodeToString(rnd)
 	if fileName == "" {
-		return "Empty file name", errors.New("Empty file name")
+		return "Empty file name", errors.New("empty file name")
 	}
 	nonce, err := generateRandomBytes(12)
 	if err != nil {

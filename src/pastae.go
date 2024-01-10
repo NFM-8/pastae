@@ -141,7 +141,6 @@ func main() {
 	} else {
 		log.Fatal(s.ListenAndServe())
 	}
-	return
 }
 
 func readConfig(file string) error {
@@ -182,11 +181,12 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	res, err := DB.Query("SELECT pid,COALESCE(expire,0) as ex,ct FROM data WHERE uid = $1", uid)
-	defer res.Close()
 	if err != nil {
+		res.Close()
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	defer res.Close()
 	var resp []PastaeListing
 	for res.Next() {
 		var elem PastaeListing

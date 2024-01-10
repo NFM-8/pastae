@@ -37,19 +37,19 @@ func TestLRUCache(t *testing.T) {
 	if err != nil || len(PASTAEMAP) != PASTAELIST.Len() {
 		t.Errorf("Size mismatch")
 	}
-	data, ok := PASTAEMAP[id1]
+	_, ok := PASTAEMAP[id1]
 	if ok {
 		t.Errorf("Cache clearing failed")
 	}
-	data, ok = PASTAEMAP[id2]
+	_, ok = PASTAEMAP[id2]
 	if ok {
 		t.Errorf("Cache clearing failed")
 	}
-	data, ok = PASTAEMAP[id3]
+	_, ok = PASTAEMAP[id3]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
-	data, ok = PASTAEMAP[id4]
+	data, ok := PASTAEMAP[id4]
 	if !ok {
 		t.Errorf("Map lookup failed")
 	}
@@ -135,7 +135,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if string(fetched) != string(paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
-	data, ok = PASTAEMAP[id]
+	_, ok = PASTAEMAP[id]
 	if ok {
 		t.Errorf("Paste not burned after fetching")
 	}
