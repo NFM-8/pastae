@@ -15,14 +15,14 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	data, ok := PASTAEMAP[id]
 	PASTAEMUTEX.RUnlock()
 	if ok {
-		resp, error := fetchPaste(data)
-		if error != nil {
+		resp, err := fetchPaste(data)
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("content-type", data.ContentType)
 		w.Write(resp)
-		zeroByteArray(resp, len(resp))
+		zeroByteArray(resp)
 	} else {
 		http.NotFound(w, r)
 	}
@@ -41,7 +41,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		w.Header().Set("content-type", data.ContentType)
 		w.Write(resp)
-		zeroByteArray(resp, len(resp))
+		zeroByteArray(resp)
 	} else {
 		var fname string
 		var key []byte
@@ -49,14 +49,13 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		var uid int64
 		var contentType string
 		var ukek []byte
-		const qs = "SELECT fname,key,nonce,uid,ct,kek FROM data,users WHERE pid=$1 AND users.id=data.uid"
+		const qs string = "SELECT fname,key,nonce,uid,ct,kek FROM data,users WHERE pid=$1 AND users.id=data.uid"
 		err := DB.QueryRow(qs, id).Scan(&fname, &key, &nonce, &uid, &contentType, &ukek)
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		var file []byte
-		file, err = os.ReadFile(CONFIGURATION.DataPath + fname)
+		file, err := os.ReadFile(CONFIGURATION.DataPath + fname)
 		if err != nil {
 			log.Println(err)
 			http.NotFound(w, r)
@@ -64,7 +63,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		sum := kdf(key, ukek)
 		file, err = decrypt(file, sum[0:16], nonce)
-		zeroByteArray(sum, 32)
+		zeroByteArray(sum)
 		if err != nil {
 			log.Println(err)
 			http.NotFound(w, r)
@@ -72,7 +71,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 		w.Header().Set("content-type", contentType)
 		w.Write(file)
-		zeroByteArray(file, len(file))
+		zeroByteArray(file)
 	}
 }
 
@@ -99,6 +98,6 @@ func decryptPaste(paste Pastae) ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
-	zeroByteArray(sum, 32)
+	zeroByteArray(sum)
 	return data, nil
 }

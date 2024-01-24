@@ -139,7 +139,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	sidb, _ := generateRandomBytes(64)
+	sidb, err := generateRandomBytes(64)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	sid := hex.EncodeToString(sidb)
 	SESSIONMUTEX.Lock()
 	defer SESSIONMUTEX.Unlock()

@@ -50,18 +50,19 @@ func generateRandomBytes(num int) ([]byte, error) {
 
 func kdf(key []byte, kek []byte) []byte {
 	var ekey [32]byte
-	for i := 0; i < 16; i++ {
-		ekey[i] = key[i]
-	}
-	for i := 16; i < 32; i++ {
-		ekey[i] = kek[i-16]
+	for i := range ekey {
+		if i < 16 {
+			ekey[i] = key[i]
+		} else {
+			ekey[i] = kek[i-16]
+		}
 	}
 	sum := sha512.Sum512(ekey[0:32])
 	return sum[0:32]
 }
 
-func zeroByteArray(arr []byte, len int) {
-	for i := 0; i < len; i++ {
+func zeroByteArray(arr []byte) {
+	for i := range arr {
 		arr[i] = 0
 	}
 }

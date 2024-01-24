@@ -12,4 +12,4 @@ Encrypting paste service.
 
 * Additional scrambling of encryption keys to defend against current and future SPECTRE and MELTDOWN type attacks in hosted deployments
 
-* Pastes can be optionally stored to disk with metadata in PostgreSQL database
+* Pastes can be optionally stored to disk with metadata in SQLite database
