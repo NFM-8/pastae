@@ -40,7 +40,7 @@ type Configuration struct {
 }
 
 type Pastae struct {
-	Id               string
+	ID               string
 	ContentType      string
 	BurnAfterReading bool
 	Key              []byte
@@ -49,7 +49,7 @@ type Pastae struct {
 }
 
 type PastaeListing struct {
-	Id          string
+	ID          string
 	Expire      int64
 	ContentType string
 }
@@ -91,7 +91,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = createDbTablesAndIndexes(DB)
+		err = createDBTablesAndIndexes(DB)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -191,7 +191,7 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	for res.Next() {
 		var elem PastaeListing
 		var expireUnix int64
-		err = res.Scan(&elem.Id, &expireUnix, &elem.ContentType)
+		err = res.Scan(&elem.ID, &expireUnix, &elem.ContentType)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -257,7 +257,7 @@ func updateSessionCreationTime(sessid string) {
 	SESSIONS[sessid] = sessionData
 }
 
-func createDbTablesAndIndexes(db *sql.DB) error {
+func createDBTablesAndIndexes(db *sql.DB) error {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS users (" +
 		"id INTEGER PRIMARY KEY," +
 		"hash TEXT NOT NULL UNIQUE," +

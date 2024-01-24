@@ -87,7 +87,7 @@ func fetchPaste(pasta Pastae) ([]byte, error) {
 	if pasta.BurnAfterReading {
 		PASTAEMUTEX.Lock()
 		defer PASTAEMUTEX.Unlock()
-		delete(PASTAEMAP, PASTAELIST.Front().Value.(Pastae).Id)
+		delete(PASTAEMAP, PASTAELIST.Front().Value.(Pastae).ID)
 		PASTAELIST.Remove(PASTAELIST.Front())
 	}
 	return resp, nil

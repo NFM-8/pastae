@@ -205,7 +205,7 @@ func TestCreateDbTablesAndIndexes(t *testing.T) {
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = "TestUser"
-	err = createDbTablesAndIndexes(db)
+	err = createDBTablesAndIndexes(db)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -218,7 +218,7 @@ func TestSessionValidWithPersistUser(t *testing.T) {
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = "TestUser"
-	err = createDbTablesAndIndexes(db)
+	err = createDBTablesAndIndexes(db)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -240,7 +240,7 @@ func TestRegisterUser(t *testing.T) {
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = ""
-	err = createDbTablesAndIndexes(db)
+	err = createDBTablesAndIndexes(db)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -264,7 +264,7 @@ func TestSessionValid(t *testing.T) {
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = ""
 	CONFIGURATION.DatabaseTimeout = 36000
-	err = createDbTablesAndIndexes(db)
+	err = createDBTablesAndIndexes(db)
 	if err != nil {
 		t.Errorf(err.Error())
 	}

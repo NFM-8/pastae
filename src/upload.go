@@ -176,7 +176,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) (string, error)
 	defer PASTAEMUTEX.Unlock()
 	if len(PASTAEMAP) >= CONFIGURATION.MaxEntries {
 		if PASTAELIST.Len() > 0 {
-			delete(PASTAEMAP, PASTAELIST.Front().Value.(Pastae).Id)
+			delete(PASTAEMAP, PASTAELIST.Front().Value.(Pastae).ID)
 			PASTAELIST.Remove(PASTAELIST.Front())
 		}
 	}
@@ -203,7 +203,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) (string, error)
 		ct := strings.Split(contentType, "/")
 		id += "." + ct[1]
 	}
-	paste := Pastae{Id: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
+	paste := Pastae{ID: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
 	PASTAEMAP[id] = paste
 	PASTAELIST.PushBack(paste)
 	return CONFIGURATION.URL + id, nil
