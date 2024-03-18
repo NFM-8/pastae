@@ -11,12 +11,12 @@ import (
 func encrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return []byte("err"), err
+		return []byte(err.Error()), err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return []byte("err"), err
+		return []byte(err.Error()), err
 	}
 
 	data = aesgcm.Seal(nil, nonce, []byte(data), nil)
@@ -26,16 +26,16 @@ func encrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
 func decrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return []byte("err"), err
+		return []byte(err.Error()), err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return []byte("err"), err
+		return []byte(err.Error()), err
 	}
 	data, err = aesgcm.Open(nil, nonce, data, nil)
 	if err != nil {
-		return []byte("err"), err
+		return []byte(err.Error()), err
 	}
 	return data, nil
 }
@@ -43,7 +43,7 @@ func decrypt(data []byte, key []byte, nonce []byte) ([]byte, error) {
 func generateRandomBytes(num int) ([]byte, error) {
 	bytes := make([]byte, num)
 	if _, err := io.ReadFull(rand.Reader, bytes); err != nil {
-		return []byte("err"), err
+		return []byte(err.Error()), err
 	}
 	return bytes, nil
 }

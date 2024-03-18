@@ -10,9 +10,8 @@ import (
 )
 
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	id := p.ByName("id")
 	PASTAEMUTEX.RLock()
-	data, ok := PASTAEMAP[id]
+	data, ok := PASTAEMAP[p.ByName("id")]
 	PASTAEMUTEX.RUnlock()
 	if ok {
 		resp, err := fetchPaste(data)
@@ -52,6 +51,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		const qs string = "SELECT fname,key,nonce,uid,ct,kek FROM data,users WHERE pid=$1 AND users.id=data.uid"
 		err := DB.QueryRow(qs, id).Scan(&fname, &key, &nonce, &uid, &contentType, &ukek)
 		if err != nil {
+			log.Println(err)
 			http.NotFound(w, r)
 			return
 		}
@@ -81,7 +81,7 @@ func fetchPaste(pasta Pastae) ([]byte, error) {
 	}
 	resp, err := decryptPaste(pasta)
 	if err != nil {
-		return []byte("ERROR"), err
+		return []byte(err.Error()), err
 	}
 	if pasta.BurnAfterReading {
 		PASTAEMUTEX.Lock()
@@ -96,7 +96,7 @@ func decryptPaste(paste Pastae) ([]byte, error) {
 	sum := kdf(paste.Key, KEK)
 	data, err := decrypt(paste.Payload, sum[0:16], paste.Nonce)
 	if err != nil {
-		return []byte(""), err
+		return []byte(err.Error()), err
 	}
 	zeroByteArray(sum)
 	return data, nil

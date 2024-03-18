@@ -27,17 +27,12 @@ func sessionCleaner(sleepTime time.Duration) {
 }
 
 func cleanSessions() {
-	t := time.Now().Unix()
-	var expired []string
 	SESSIONMUTEX.Lock()
 	defer SESSIONMUTEX.Unlock()
 	for k, v := range SESSIONS {
-		if t-v.Created >= CONFIGURATION.DatabaseTimeout {
-			expired = append(expired, k)
+		if time.Now().Unix()-v.Created >= CONFIGURATION.DatabaseTimeout {
+			delete(SESSIONS, k)
 		}
-	}
-	for _, k := range expired {
-		delete(SESSIONS, k)
 	}
 }
 
@@ -64,19 +59,17 @@ func cleanExpired(db *sql.DB) {
 	}
 	defer r.Close()
 	for r.Next() {
+		SESSIONPASTECOUNT.Add(-1)
 		var fname string
 		err = r.Scan(&fname)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		SESSIONPASTECOUNT.Add(-1)
-		go func(fname string) {
-			err = os.Remove(CONFIGURATION.DataPath + fname)
-			if err != nil {
-				log.Println(err)
-			}
-		}(fname)
+		err = os.Remove(CONFIGURATION.DataPath + fname)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -119,7 +112,6 @@ func registerUser(db *sql.DB, hash string) error {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	var hash []byte
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	if string(hash) == CONFIGURATION.DatabasePersistUser {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -153,7 +145,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	var hash []byte
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer r.Body.Close()
 	if err != nil {

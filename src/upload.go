@@ -111,12 +111,22 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 			log.Println("Body close")
 			return
 		}
+		if id == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Print("Empty id")
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(id))
 		return
 	}
 	file, header, err := r.FormFile("file")
-	if err != nil || header.Size > maxEntrySize {
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if header.Size > maxEntrySize {
+		log.Printf("header.Size (%d) > maxEntrySize (%d)", header.Size, maxEntrySize)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -238,50 +248,53 @@ func insertPasteToFile(pasteData []byte,
 	if err != nil {
 		return err.Error(), err
 	}
-	var dbStatus string
-	var fileStatus string
+	var dbErr error
+	var fileErr error
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(uid int64, id string, fileName string, key []byte, nonce []byte, ct string, dbStatus *string) {
+	go func(uid int64, id string, fileName string, key []byte, nonce []byte, ct string, dbErr *error) {
 		defer wg.Done()
 		if expire == 0 {
 			qs := "INSERT INTO data (uid, pid, fname, key, nonce, ct)" +
 				"VALUES ($1, $2, $3, $4, $5, $6)"
 			_, err := DB.Exec(qs, uid, id, fileName, key, nonce, contentType)
 			if err != nil {
-				*dbStatus = "ERROR"
+				*dbErr = err
 				return
 			}
-			*dbStatus = "OK"
+			dbErr = nil
 		} else {
 			qs := "INSERT INTO data (uid, pid, fname, key, nonce, ct, expire)" +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7)"
 			_, err := DB.Exec(qs, uid, id, fileName, key, nonce, contentType, expire)
 			if err != nil {
-				*dbStatus = "ERROR"
+				*dbErr = err
 				return
 			}
-			*dbStatus = "OK"
+			dbErr = nil
 		}
-	}(uid, id, fileName, key, nonce, contentType, &dbStatus)
+	}(uid, id, fileName, key, nonce, contentType, &dbErr)
 	wg.Add(1)
-	go func(pasteData []byte, fileName string, key []byte, nonce []byte, ukek []byte, fileStatus *string) {
+	go func(pasteData []byte, fileName string, key []byte, nonce []byte, ukek []byte, fileErr *error) {
 		defer wg.Done()
 		pasteData, err = encryptData(pasteData, key, nonce, ukek)
 		if err != nil {
-			*fileStatus = err.Error()
+			*fileErr = err
 			return
 		}
 		err := os.WriteFile(CONFIGURATION.DataPath+fileName, pasteData, 0644)
 		if err != nil {
-			*fileStatus = err.Error()
+			*fileErr = err
 			return
 		}
-		*fileStatus = "OK"
-	}(pasteData, fileName, key, nonce, ukek, &fileStatus)
+		fileErr = nil
+	}(pasteData, fileName, key, nonce, ukek, &fileErr)
 	wg.Wait()
-	if fileStatus != dbStatus || fileStatus != "OK" {
-		return "ERROR", errors.New("ERROR")
+	if fileErr != dbErr {
+		if dbErr != nil {
+			return dbErr.Error(), dbErr
+		}
+		return fileErr.Error(), fileErr
 	}
 	return CONFIGURATION.URL + id, nil
 }
@@ -297,7 +310,6 @@ func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	go func(pid string) {
 		var fname string
 		err := DB.QueryRow("DELETE FROM data WHERE pid = $1 RETURNING fname", pid).Scan(&fname)
@@ -316,15 +328,15 @@ func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		}
 		SESSIONPASTECOUNT.Add(-1)
 	}(p.ByName("id"))
+	w.WriteHeader(http.StatusOK)
 }
 
 func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, error) {
 	sum := kdf(key, kek)
 	payload, err := encrypt(payload, sum[0:16], nonce)
+	zeroByteArray(sum)
 	if err != nil {
-		zeroByteArray(sum)
 		return nil, err
 	}
-	zeroByteArray(sum)
 	return payload, nil
 }
