@@ -31,6 +31,10 @@ func uploadPasteS(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
 	var maxEntrySize int64 = 0
 	if session {
 		maxEntrySize = CONFIGURATION.DatabaseMaxEntrySize
@@ -300,6 +304,10 @@ func insertPasteToFile(pasteData []byte,
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
 	sessid := r.Header.Get("pastae-sessid")
 	if sessid == "" {
 		w.WriteHeader(http.StatusUnauthorized)

@@ -97,6 +97,9 @@ func sessionValid(db *sql.DB, token string) (int64, []byte, error) {
 }
 
 func registerUser(db *sql.DB, hash string) error {
+	if db == nil {
+		return errors.New("nil db")
+	}
 	if len(hash) == 0 {
 		return errors.New("empty hash")
 	}
@@ -112,6 +115,10 @@ func registerUser(db *sql.DB, hash string) error {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	if string(hash) == CONFIGURATION.DatabasePersistUser {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -145,6 +152,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer r.Body.Close()
 	if err != nil {

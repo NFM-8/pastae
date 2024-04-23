@@ -3,8 +3,11 @@ package main
 import (
 	"container/list"
 	"database/sql"
+	"net/http"
 	"testing"
 	"time"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 func TestLRUCache(t *testing.T) {
@@ -304,4 +307,32 @@ func TestSessionValid(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
+}
+
+func TestServePaste(t *testing.T) {
+	var w http.ResponseWriter
+	var r *http.Request = nil
+	var p httprouter.Params
+	servePaste(w, r, p)
+}
+
+func TestServePasteS(t *testing.T) {
+	var w http.ResponseWriter
+	var r *http.Request = nil
+	var p httprouter.Params
+	servePasteS(w, r, p)
+}
+
+func TestUploadPasteImpl(t *testing.T) {
+	var w http.ResponseWriter
+	var r *http.Request = nil
+	uploadPasteImpl(w, r, true)
+	uploadPasteImpl(w, r, false)
+}
+
+func TestDeleteHandler(t *testing.T) {
+	var w http.ResponseWriter
+	var r *http.Request = nil
+	var p httprouter.Params
+	deleteHandler(w, r, p)
 }

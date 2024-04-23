@@ -10,6 +10,10 @@ import (
 )
 
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
 	PASTAEMUTEX.RLock()
 	data, ok := PASTAEMAP[p.ByName("id")]
 	PASTAEMUTEX.RUnlock()
@@ -28,6 +32,10 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
 	id := p.ByName("id")
 	PASTAEMUTEX.RLock()
 	data, ok := PASTAEMAP[id]
