@@ -84,25 +84,25 @@ func TestInsertPaste(t *testing.T) {
 	}
 	id, err := insertPaste(paste, false, contentType)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	data, ok := PASTAEMAP[id]
 	if !ok {
-		t.Errorf("Map lookup failed")
+		t.Error("Map lookup failed")
 	}
 	fetched, error := fetchPaste(data)
 	if error != nil {
-		t.Errorf("fetchPaste failed")
+		t.Error("fetchPaste failed")
 	}
 	if string(fetched) != string(paste) {
-		t.Errorf("Fetched paste is corrupted")
+		t.Error("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
 	if error != nil {
-		t.Errorf("fetchPaste failed")
+		t.Error("fetchPaste failed")
 	}
 	if string(fetched) != string(paste) {
-		t.Errorf("Fetched paste is corrupted")
+		t.Error("Fetched paste is corrupted")
 	}
 }
 
@@ -125,22 +125,22 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	}
 	id, err := insertPaste(paste, true, contentType)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	data, ok := PASTAEMAP[id]
 	if !ok {
-		t.Errorf("Map lookup failed")
+		t.Error("Map lookup failed")
 	}
 	fetched, error := fetchPaste(data)
 	if error != nil {
-		t.Errorf("fetchPaste failed")
+		t.Error("fetchPaste failed")
 	}
 	if string(fetched) != string(paste) {
-		t.Errorf("Fetched paste is corrupted")
+		t.Error("Fetched paste is corrupted")
 	}
 	_, ok = PASTAEMAP[id]
 	if ok {
-		t.Errorf("Paste not burned after fetching")
+		t.Error("Paste not burned after fetching")
 	}
 }
 
@@ -164,148 +164,145 @@ func TestSessionCleaning(t *testing.T) {
 	cleanSessions()
 	_, ok := SESSIONS["expired"]
 	if ok {
-		t.Errorf("Expired session not cleaned")
+		t.Error("Expired session not cleaned")
 	}
 	_, ok = SESSIONS["valid"]
 	if !ok {
-		t.Errorf("Valid session cleaned")
+		t.Error("Valid session cleaned")
 	}
 }
 
 func TestSessionValidation(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	defer db.Close()
 	SESSIONS["sess"] = Session{UserID: 100500, Created: time.Now().Unix()}
 	id, _, err := sessionValid(db, "sess")
 	if id < 0 || err != nil {
-		t.Errorf("Valid session deemed invalid")
+		t.Error("Valid session deemed invalid")
 	}
 	id, _, err = sessionValid(db, "invalid")
 	if id >= 0 || err == nil {
-		t.Errorf("Invalid session deemed valid")
+		t.Error("Invalid session deemed valid")
 	}
 }
 
 func TestSessionCreationTimeUpdate(t *testing.T) {
-	var session Session
-	session.UserID = 100500
-	session.Created = time.Now().Unix() - 1000
-	SESSIONS["update"] = session
+	SESSIONS["update"] = Session{UserID: 100500, Created: time.Now().Unix() - 1000}
 	updateSessionCreationTime("update")
 	updated := SESSIONS["update"]
 	if updated.Created < time.Now().Unix() {
-		t.Errorf("Session creation time not updated")
+		t.Error("Session creation time not updated")
 	}
 }
 
 func TestCreateDbTablesAndIndexes(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = "TestUser"
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 }
 
 func TestSessionValidWithPersistUser(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = "TestUser"
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 
 	sid, _, err := sessionValid(db, "")
 	if sid < 0 || err != nil {
-		t.Errorf("Persist session not accepted")
+		t.Error("Persist session not accepted")
 	}
 	sid, _, err = sessionValid(db, "Invalid")
 	if sid >= 0 || err == nil {
-		t.Errorf("Invalid session accepted")
+		t.Error("Invalid session accepted")
 	}
 }
 
 func TestRegisterUser(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = ""
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 
 	user := "UseNameAhto"
 	err = registerUser(db, user)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	err = registerUser(db, user)
 	if err == nil {
-		t.Errorf("Duplicate user accepted")
+		t.Error("Duplicate user accepted")
 	}
 }
 
 func TestSessionValid(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	defer db.Close()
 	CONFIGURATION.DatabasePersistUser = ""
 	CONFIGURATION.DatabaseTimeout = 36000
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 
 	user := "UserSima"
 	err = registerUser(db, user)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	cleanSessions()
 	SESSIONS["bond"] = Session{Created: time.Now().Unix(), Kek: []byte("license to kill"), UserID: 7}
 	_, _, err = sessionValid(db, "bond")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	cleanSessions()
 	_, _, err = sessionValid(db, "bond")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 	_, _, err = sessionValid(db, "")
 	if err == nil {
-		t.Errorf("Invalid session ID accepted")
+		t.Error("Invalid session ID accepted")
 	}
 	_, _, err = sessionValid(db, "bondi")
 	if err == nil {
-		t.Errorf("Invalid session ID accepted")
+		t.Error("Invalid session ID accepted")
 	}
 
 	SESSIONS["Q"] = Session{Created: time.Now().Unix() - 36020, Kek: []byte("Q"), UserID: 10}
 	cleanSessions()
 	_, _, err = sessionValid(db, "Q")
 	if err == nil {
-		t.Errorf("Expired session accepted")
+		t.Error("Expired session accepted")
 	}
 	_, _, err = sessionValid(db, "bond")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 }
 
