@@ -55,11 +55,11 @@ type PastaeListing struct {
 }
 
 var CONFIGURATION Configuration
-var PASTAEMAP map[string]Pastae
+var PASTAEMAP map[string]*Pastae
 var PASTAELIST *list.List
 var PASTAEMUTEX sync.RWMutex
 var SESSIONMUTEX sync.RWMutex
-var SESSIONS map[string]Session
+var SESSIONS map[string]*Session
 var SESSIONPASTECOUNT atomic.Int64
 var KEK []byte
 var FRONTPAGE []byte
@@ -70,7 +70,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	PASTAEMAP = make(map[string]Pastae)
+	PASTAEMAP = make(map[string]*Pastae)
 	PASTAELIST = list.New()
 	KEK, err = generateRandomBytes(1024)
 	if err != nil {
@@ -95,7 +95,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		SESSIONS = make(map[string]Session)
+		SESSIONS = make(map[string]*Session)
 		go sessionCleaner(time.Minute)
 		go expiredCleaner(DB, time.Minute)
 		pasteServer = servePasteS

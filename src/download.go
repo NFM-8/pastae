@@ -83,7 +83,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 }
 
-func fetchPaste(pasta Pastae) ([]byte, error) {
+func fetchPaste(pasta *Pastae) ([]byte, error) {
 	if PASTAELIST == nil {
 		return []byte(""), errors.New("PASTAELIST is nil")
 	}
@@ -100,7 +100,7 @@ func fetchPaste(pasta Pastae) ([]byte, error) {
 	return resp, nil
 }
 
-func decryptPaste(paste Pastae) ([]byte, error) {
+func decryptPaste(paste *Pastae) ([]byte, error) {
 	sum := kdf(paste.Key, KEK)
 	data, err := decrypt(paste.Payload, sum[0:16], paste.Nonce)
 	if err != nil {

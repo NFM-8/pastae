@@ -12,7 +12,7 @@ import (
 
 func TestLRUCache(t *testing.T) {
 	CONFIGURATION.MaxEntries = 2
-	PASTAEMAP = make(map[string]Pastae)
+	PASTAEMAP = make(map[string]*Pastae)
 	PASTAELIST = list.New()
 	paste := []byte("Trololooloti")
 	contentType := "image/dat"
@@ -73,7 +73,7 @@ func TestLRUCache(t *testing.T) {
 }
 
 func TestInsertPaste(t *testing.T) {
-	PASTAEMAP = make(map[string]Pastae)
+	PASTAEMAP = make(map[string]*Pastae)
 	PASTAELIST = list.New()
 	paste := []byte("Trololoo")
 	contentType := "wolo/daaddaaaa"
@@ -114,7 +114,7 @@ func TestInsertPastaes(t *testing.T) {
 }
 
 func TestInsertPasteBurnAfterReading(t *testing.T) {
-	PASTAEMAP = make(map[string]Pastae)
+	PASTAEMAP = make(map[string]*Pastae)
 	PASTAELIST = list.New()
 	paste := []byte("Wololo")
 	contentType := "trolo/daadda"
@@ -152,15 +152,9 @@ func TestInsertPastaesBurnAfterReading(t *testing.T) {
 }
 
 func TestSessionCleaning(t *testing.T) {
-	SESSIONS = make(map[string]Session)
-	var session Session
-	session.UserID = 765
-	session.Created = time.Now().Unix() - 100500100500
-	SESSIONS["expired"] = session
-	var session2 Session
-	session2.UserID = 3124
-	session2.Created = time.Now().Unix() + 100500100500
-	SESSIONS["valid"] = session2
+	SESSIONS = make(map[string]*Session)
+	SESSIONS["expired"] = &Session{UserID: 765, Created: time.Now().Unix() - 100500100500}
+	SESSIONS["valid"] = &Session{UserID: 3124, Created: time.Now().Unix() + 100500100500}
 	cleanSessions()
 	_, ok := SESSIONS["expired"]
 	if ok {
@@ -178,7 +172,7 @@ func TestSessionValidation(t *testing.T) {
 		t.Error(err)
 	}
 	defer db.Close()
-	SESSIONS["sess"] = Session{UserID: 100500, Created: time.Now().Unix()}
+	SESSIONS["sess"] = &Session{UserID: 100500, Created: time.Now().Unix()}
 	id, _, err := sessionValid(db, "sess")
 	if id < 0 || err != nil {
 		t.Error("Valid session deemed invalid")
@@ -190,7 +184,7 @@ func TestSessionValidation(t *testing.T) {
 }
 
 func TestSessionCreationTimeUpdate(t *testing.T) {
-	SESSIONS["update"] = Session{UserID: 100500, Created: time.Now().Unix() - 1000}
+	SESSIONS["update"] = &Session{UserID: 100500, Created: time.Now().Unix() - 1000}
 	updateSessionCreationTime("update")
 	updated := SESSIONS["update"]
 	if updated.Created < time.Now().Unix() {
@@ -275,7 +269,7 @@ func TestSessionValid(t *testing.T) {
 		t.Error(err)
 	}
 	cleanSessions()
-	SESSIONS["bond"] = Session{Created: time.Now().Unix(), Kek: []byte("license to kill"), UserID: 7}
+	SESSIONS["bond"] = &Session{Created: time.Now().Unix(), Kek: []byte("license to kill"), UserID: 7}
 	_, _, err = sessionValid(db, "bond")
 	if err != nil {
 		t.Error(err)
@@ -294,7 +288,7 @@ func TestSessionValid(t *testing.T) {
 		t.Error("Invalid session ID accepted")
 	}
 
-	SESSIONS["Q"] = Session{Created: time.Now().Unix() - 36020, Kek: []byte("Q"), UserID: 10}
+	SESSIONS["Q"] = &Session{Created: time.Now().Unix() - 36020, Kek: []byte("Q"), UserID: 10}
 	cleanSessions()
 	_, _, err = sessionValid(db, "Q")
 	if err == nil {

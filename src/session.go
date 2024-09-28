@@ -147,7 +147,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	sid := hex.EncodeToString(sidb)
 	SESSIONMUTEX.Lock()
 	defer SESSIONMUTEX.Unlock()
-	SESSIONS[sid] = Session{Created: time.Now().Unix(), Kek: kek, UserID: uid}
+	SESSIONS[sid] = &Session{Created: time.Now().Unix(), Kek: kek, UserID: uid}
 	w.Write([]byte(sid))
 }
 

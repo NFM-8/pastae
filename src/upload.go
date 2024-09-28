@@ -218,7 +218,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) (string, error)
 		id += "." + ct[1]
 	}
 	paste := Pastae{ID: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
-	PASTAEMAP[id] = paste
+	PASTAEMAP[id] = &paste
 	PASTAELIST.PushBack(paste)
 	return CONFIGURATION.URL + id, nil
 }
