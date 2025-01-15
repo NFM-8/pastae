@@ -166,7 +166,10 @@ func readConfig(file string) error {
 }
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	w.Write(FRONTPAGE)
+	_, err := w.Write(FRONTPAGE)
+	if err != nil {
+		log.Println(err.Error())
+	}
 }
 
 func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -205,7 +208,10 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	w.Write(bytes)
+	_, err = w.Write(bytes)
+	if err != nil {
+		log.Println(err.Error())
+	}
 }
 
 func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -312,7 +318,10 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	}
 	err = registerUser(DB, string(hash))
 	if err == nil {
-		w.Write([]byte("OK"))
+		_, err = w.Write([]byte("OK"))
+		if err != nil {
+			log.Println(err.Error())
+		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 		return

@@ -24,7 +24,10 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			return
 		}
 		w.Header().Set("content-type", data.ContentType)
-		w.Write(resp)
+		_, err = w.Write(resp)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		zeroByteArray(resp)
 	} else {
 		http.NotFound(w, r)
@@ -47,7 +50,10 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			return
 		}
 		w.Header().Set("content-type", data.ContentType)
-		w.Write(resp)
+		_, err = w.Write(resp)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		zeroByteArray(resp)
 	} else {
 		var fname string
@@ -78,7 +84,10 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			return
 		}
 		w.Header().Set("content-type", contentType)
-		w.Write(file)
+		_, err = w.Write(file)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		zeroByteArray(file)
 	}
 }

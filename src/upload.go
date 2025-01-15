@@ -35,7 +35,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		log.Println("http.Request is nil")
 		return
 	}
-	var maxEntrySize int64 = 0
+	var maxEntrySize int64
 	if session {
 		maxEntrySize = CONFIGURATION.DatabaseMaxEntrySize
 	} else {
@@ -121,7 +121,10 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(id))
+		_, err = w.Write([]byte(id))
+		if err != nil {
+			log.Println(err.Error())
+		}
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -179,7 +182,10 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(id))
+	_, err = w.Write([]byte(id))
+	if err != nil {
+		log.Println(err.Error())
+	}
 }
 
 func insertPaste(pasteData []byte, bar bool, contentType string) (string, error) {
@@ -266,7 +272,6 @@ func insertPasteToFile(pasteData []byte,
 				*dbErr = err
 				return
 			}
-			dbErr = nil
 		} else {
 			qs := "INSERT INTO data (uid, pid, fname, key, nonce, ct, expire)" +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7)"
@@ -275,7 +280,6 @@ func insertPasteToFile(pasteData []byte,
 				*dbErr = err
 				return
 			}
-			dbErr = nil
 		}
 	}(uid, id, fileName, key, nonce, contentType, &dbErr)
 	wg.Add(1)
@@ -291,7 +295,6 @@ func insertPasteToFile(pasteData []byte,
 			*fileErr = err
 			return
 		}
-		fileErr = nil
 	}(pasteData, fileName, key, nonce, ukek, &fileErr)
 	wg.Wait()
 	if fileErr != dbErr {
