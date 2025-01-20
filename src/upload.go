@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
-	"image"
 	"io"
 	"log"
 	"net/http"
@@ -12,12 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
-
-	_ "golang.org/x/image/webp"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -143,13 +135,11 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		log.Println("Reading file")
 		return
 	}
-	_, format, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
+	valid, contentType := validContentType(data)
+	if !valid {
 		w.WriteHeader(http.StatusBadRequest)
-		log.Println(err)
 		return
 	}
-	contentType = "image/" + format
 	var id string
 	if session {
 		if bar {
@@ -221,7 +211,11 @@ func insertPaste(pasteData []byte, bar bool, contentType string) (string, error)
 		id += ".txt"
 	} else {
 		ct := strings.Split(contentType, "/")
-		id += "." + ct[1]
+		if len(ct) != 1 {
+			id += "." + ct[1]
+		} else {
+			log.Println("Invalid Content Type: " + contentType)
+		}
 	}
 	paste := Pastae{ID: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
 	PASTAEMAP[id] = &paste
@@ -240,7 +234,11 @@ func insertPasteToFile(pasteData []byte,
 		id += ".txt"
 	} else {
 		ct := strings.Split(contentType, "/")
-		id += "." + ct[1]
+		if len(ct) != 1 {
+			id += "." + ct[1]
+		} else {
+			log.Println("Invalid Content Type: " + contentType)
+		}
 	}
 	rnd, err = generateRandomBytes(12)
 	if err != nil {
@@ -350,4 +348,12 @@ func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, 
 		return nil, err
 	}
 	return payload, nil
+}
+
+func validContentType(data []byte) (bool, string) {
+	ct := http.DetectContentType(data)
+	if ct == "image/jpeg" || ct == "image/tiff" || ct == "image/webp" || ct == "image/gif" || ct == "image/png" {
+		return true, ct
+	}
+	return false, ct
 }
