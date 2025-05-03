@@ -3,6 +3,7 @@ package main
 import (
 	"container/list"
 	"database/sql"
+	"log"
 	"net/http"
 	"testing"
 	"time"
@@ -171,7 +172,12 @@ func TestSessionValidation(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer db.Close()
+	defer func() {
+		ec := db.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	SESSIONS["sess"] = &Session{UserID: 100500, Created: time.Now().Unix()}
 	id, _, err := sessionValid(db, "sess")
 	if id < 0 || err != nil {
@@ -197,7 +203,12 @@ func TestCreateDbTablesAndIndexes(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer db.Close()
+	defer func() {
+		ec := db.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	CONFIGURATION.DatabasePersistUser = "TestUser"
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
@@ -210,7 +221,12 @@ func TestSessionValidWithPersistUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer db.Close()
+	defer func() {
+		ec := db.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	CONFIGURATION.DatabasePersistUser = "TestUser"
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
@@ -232,7 +248,12 @@ func TestRegisterUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer db.Close()
+	defer func() {
+		ec := db.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	CONFIGURATION.DatabasePersistUser = ""
 	err = createDBTablesAndIndexes(db)
 	if err != nil {
@@ -255,7 +276,12 @@ func TestSessionValid(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer db.Close()
+	defer func() {
+		ec := db.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	CONFIGURATION.DatabasePersistUser = ""
 	CONFIGURATION.DatabaseTimeout = 36000
 	err = createDBTablesAndIndexes(db)

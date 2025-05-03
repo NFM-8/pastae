@@ -185,11 +185,19 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 	res, err := DB.Query("SELECT pid,COALESCE(expire,0) as ex,ct FROM data WHERE uid = $1", uid)
 	if err != nil {
-		res.Close()
+		ec := res.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	defer res.Close()
+	defer func() {
+		ec := res.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	var resp []PastaeListing
 	for res.Next() {
 		var elem PastaeListing
@@ -310,7 +318,12 @@ func createDBTablesAndIndexes(db *sql.DB) error {
 
 func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
-	defer r.Body.Close()
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)

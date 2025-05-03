@@ -53,11 +53,19 @@ func cleanExpired(db *sql.DB) {
 	r, err := db.Query("DELETE FROM data WHERE expire IS NOT NULL AND expire <= $1 RETURNING fname",
 		time.Now().Unix())
 	if err != nil {
-		r.Close()
+		ec := r.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
 		log.Println(err)
 		return
 	}
-	defer r.Close()
+	defer func() {
+		ec := r.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	for r.Next() {
 		SESSIONPASTECOUNT.Add(-1)
 		var fname string
@@ -124,7 +132,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	defer r.Body.Close()
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -160,7 +173,12 @@ func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		return
 	}
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
-	defer r.Body.Close()
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
