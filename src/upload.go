@@ -352,7 +352,7 @@ func encryptData(payload []byte, key []byte, nonce []byte, kek []byte) ([]byte, 
 
 func validContentType(data []byte) (bool, string) {
 	ct := http.DetectContentType(data)
-	if ct == "image/jpeg" || ct == "image/tiff" || ct == "image/webp" || ct == "image/gif" || ct == "image/png" {
+	if ct == "image/jpeg" || ct == "image/tiff" || ct == "image/webp" || ct == "image/gif" || ct == "image/png" || ct == "image/avif" {
 		return true, ct
 	}
 	return false, ct
