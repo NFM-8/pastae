@@ -14,6 +14,13 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		log.Println("http.Request is nil")
 		return
 	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
+
 	PASTAEMUTEX.RLock()
 	data, ok := PASTAEMAP[p.ByName("id")]
 	PASTAEMUTEX.RUnlock()
@@ -39,6 +46,12 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		log.Println("http.Request is nil")
 		return
 	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	id := p.ByName("id")
 	PASTAEMUTEX.RLock()
 	data, ok := PASTAEMAP[id]

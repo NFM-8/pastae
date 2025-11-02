@@ -127,6 +127,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		log.Println("http.Request is nil")
 		return
 	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	if string(hash) == CONFIGURATION.DatabasePersistUser {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -172,6 +178,12 @@ func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		log.Println("http.Request is nil")
 		return
 	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer func() {
 		ec := r.Body.Close()

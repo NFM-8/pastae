@@ -166,6 +166,16 @@ func readConfig(file string) error {
 }
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	_, err := w.Write(FRONTPAGE)
 	if err != nil {
 		log.Println(err.Error())
@@ -173,6 +183,16 @@ func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 }
 
 func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	sessid := r.Header.Get("pastae-sessid")
 	if sessid == "" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -223,6 +243,16 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	sessid := r.Header.Get("pastae-sessid")
 	if sessid == "" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -249,6 +279,12 @@ func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
 func pingHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	sessid := r.Header.Get("pastae-sessid")
 	if sessid == "" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -317,6 +353,16 @@ func createDBTablesAndIndexes(db *sql.DB) error {
 }
 
 func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r == nil {
+		log.Println("http.Request is nil")
+		return
+	}
+	defer func() {
+		ec := r.Body.Close()
+		if ec != nil {
+			log.Println(ec.Error())
+		}
+	}()
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer func() {
 		ec := r.Body.Close()
