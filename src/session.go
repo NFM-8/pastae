@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -55,15 +55,15 @@ func cleanExpired(db *sql.DB) {
 	if err != nil {
 		ec := r.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
-		log.Println(err)
+		slog.Error(err.Error())
 		return
 	}
 	defer func() {
 		ec := r.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	for r.Next() {
@@ -71,12 +71,12 @@ func cleanExpired(db *sql.DB) {
 		var fname string
 		err = r.Scan(&fname)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 			continue
 		}
 		err = os.Remove(CONFIGURATION.DataPath + fname)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 		}
 	}
 }
@@ -124,13 +124,13 @@ func registerUser(db *sql.DB, hash string) error {
 
 func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
@@ -141,11 +141,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -153,13 +153,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var kek []byte
 	err = DB.QueryRow("SELECT id, kek FROM users WHERE hash = $1", string(hash)).Scan(&uid, &kek)
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	sidb, err := generateRandomBytes(64)
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -169,26 +169,26 @@ func loginHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	SESSIONS[sid] = &Session{Created: time.Now().Unix(), Kek: kek, UserID: uid}
 	_, err = w.Write([]byte(sid))
 	if err != nil {
-		log.Println(err.Error())
+		slog.Error(err.Error())
 	}
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	if err != nil {

@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -24,13 +24,13 @@ func uploadPasteS(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	var maxEntrySize int64
@@ -42,7 +42,7 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 	err := r.ParseMultipartForm(maxEntrySize)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		log.Println("MultiPart parsing")
+		slog.Error("MultiPart parsing")
 		return
 	}
 	var expire int64 = 0
@@ -65,15 +65,16 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 				err = DB.QueryRow("DELETE FROM data WHERE id =" +
 					"(SELECT id FROM data ORDER BY id LIMIT 1) RETURNING fname").Scan(&fname)
 				if err != nil {
-					log.Println(err)
+					slog.Error(err.Error())
+					return
 				}
 				if fname == "" {
-					log.Println("empty file name")
+					slog.Error("empty file name")
 					return
 				}
 				err = os.Remove(CONFIGURATION.DataPath + fname)
 				if err != nil {
-					log.Println(err)
+					slog.Error(err.Error())
 				}
 			}()
 		}
@@ -88,14 +89,14 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 				id, err = insertPaste([]byte(r.FormValue("data")), bar, contentType)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					log.Println(err)
+					slog.Error(err.Error())
 					return
 				}
 			} else {
 				id, err = insertPasteToFile([]byte(r.FormValue("data")), contentType, uid, expire, ukek)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					log.Println(err)
+					slog.Error(err.Error())
 					return
 				}
 				SESSIONPASTECOUNT.Add(1)
@@ -104,24 +105,23 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 			id, err = insertPaste([]byte(r.FormValue("data")), bar, contentType)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println(err)
+				slog.Error(err.Error())
 				return
 			}
 		}
 		if err := r.Body.Close(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			log.Println("Body close")
+			slog.Error("Body close")
 			return
 		}
 		if id == "" {
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Print("Empty id")
+			slog.Error("Empty id")
 			return
 		}
-		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(id))
 		if err != nil {
-			log.Println(err.Error())
+			slog.Error(err.Error())
 		}
 		return
 	}
@@ -131,14 +131,14 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		return
 	}
 	if header.Size > maxEntrySize {
-		log.Printf("header.Size (%d) > maxEntrySize (%d)", header.Size, maxEntrySize)
+		slog.Error("header.Size > maxEntrySize")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	data, err := io.ReadAll(io.LimitReader(file, (int64)(maxEntrySize)))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		log.Println("Reading file")
+		slog.Error("Reading file")
 		return
 	}
 	valid, contentType := validContentType(data)
@@ -152,14 +152,14 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 			id, err = insertPaste(data, bar, contentType)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println(err)
+				slog.Error(err.Error())
 				return
 			}
 		} else {
 			id, err = insertPasteToFile(data, contentType, uid, expire, ukek)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println(err)
+				slog.Error(err.Error())
 				return
 			}
 			SESSIONPASTECOUNT.Add(1)
@@ -168,19 +168,18 @@ func uploadPasteImpl(w http.ResponseWriter, r *http.Request, session bool) {
 		id, err = insertPaste(data, bar, contentType)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Println(err)
+			slog.Error(err.Error())
 			return
 		}
 	}
 	if err := r.Body.Close(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		log.Println("Body close")
+		slog.Error(err.Error())
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte(id))
 	if err != nil {
-		log.Println(err.Error())
+		slog.Error(err.Error())
 	}
 }
 
@@ -220,7 +219,7 @@ func insertPaste(pasteData []byte, bar bool, contentType string) (string, error)
 		if len(ct) != 1 {
 			id += "." + ct[1]
 		} else {
-			log.Println("Invalid Content Type: " + contentType)
+			slog.Info("Invalid Content Type: " + contentType)
 		}
 	}
 	paste := Pastae{ID: id, BurnAfterReading: bar, ContentType: contentType, Nonce: nonce, Key: key, Payload: pasteData}
@@ -243,7 +242,7 @@ func insertPasteToFile(pasteData []byte,
 		if len(ct) != 1 {
 			id += "." + ct[1]
 		} else {
-			log.Println("Invalid Content Type: " + contentType)
+			slog.Info("Invalid Content Type: " + contentType)
 		}
 	}
 	rnd, err = generateRandomBytes(12)
@@ -312,13 +311,13 @@ func insertPasteToFile(pasteData []byte,
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	sessid := r.Header.Get("pastae-sessid")
@@ -335,17 +334,17 @@ func deleteHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		var fname string
 		err := DB.QueryRow("DELETE FROM data WHERE pid = $1 RETURNING fname", pid).Scan(&fname)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 			return
 		}
 		if fname == "" {
-			log.Println("empty file name")
+			slog.Error("empty file name")
 			SESSIONPASTECOUNT.Add(-1)
 			return
 		}
 		err = os.Remove(CONFIGURATION.DataPath + fname)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 		}
 		SESSIONPASTECOUNT.Add(-1)
 	}(p.ByName("id"))

@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -11,13 +11,13 @@ import (
 
 func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 
@@ -33,7 +33,7 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.Header().Set("content-type", data.ContentType)
 		_, err = w.Write(resp)
 		if err != nil {
-			log.Println(err.Error())
+			slog.Error(err.Error())
 		}
 		zeroByteArray(resp)
 	} else {
@@ -43,13 +43,13 @@ func servePaste(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	id := p.ByName("id")
@@ -65,7 +65,7 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.Header().Set("content-type", data.ContentType)
 		_, err = w.Write(resp)
 		if err != nil {
-			log.Println(err.Error())
+			slog.Error(err.Error())
 		}
 		zeroByteArray(resp)
 	} else {
@@ -78,13 +78,13 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		const qs string = "SELECT fname,key,nonce,uid,ct,kek FROM data,users WHERE pid=$1 AND users.id=data.uid"
 		err := DB.QueryRow(qs, id).Scan(&fname, &key, &nonce, &uid, &contentType, &ukek)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 			http.NotFound(w, r)
 			return
 		}
 		file, err := os.ReadFile(CONFIGURATION.DataPath + fname)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 			http.NotFound(w, r)
 			return
 		}
@@ -92,14 +92,14 @@ func servePasteS(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		file, err = decrypt(file, sum[0:16], nonce)
 		zeroByteArray(sum)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("content-type", contentType)
 		_, err = w.Write(file)
 		if err != nil {
-			log.Println(err.Error())
+			slog.Error(err.Error())
 		}
 		zeroByteArray(file)
 	}

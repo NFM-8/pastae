@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -68,32 +68,38 @@ var DB *sql.DB
 func main() {
 	err := readConfig("pastae.json")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 	PASTAEMAP = make(map[string]*Pastae)
 	PASTAELIST = list.New()
 	KEK, err = generateRandomBytes(1024)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 
 	pasteServer := servePaste
 	uploadServer := uploadPaste
 	if CONFIGURATION.Database {
 		if _, err := os.Stat(CONFIGURATION.DataPath); os.IsNotExist(err) {
-			log.Fatal("SessionPath (" + CONFIGURATION.DataPath + ") does not exist")
+			slog.Error("SessionPath (" + CONFIGURATION.DataPath + ") does not exist")
+			os.Exit(1)
 		}
 		DB, err = sql.Open("sqlite", CONFIGURATION.DatabaseFile)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 		err = DB.Ping()
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 		err = createDBTablesAndIndexes(DB)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 		SESSIONS = make(map[string]*Session)
 		go sessionCleaner(time.Minute)
@@ -109,7 +115,8 @@ func main() {
 		var tmpCount int64 = 0
 		err = DB.QueryRow("SELECT COUNT(id) FROM data").Scan(&tmpCount)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 		SESSIONPASTECOUNT.Store(tmpCount)
 	}
@@ -137,9 +144,11 @@ func main() {
 		MaxHeaderBytes: CONFIGURATION.MaxHeaderBytes,
 	}
 	if CONFIGURATION.TLS {
-		log.Fatal(s.ListenAndServeTLS(CONFIGURATION.TLSCert, CONFIGURATION.TLSKey))
+		slog.Error(s.ListenAndServeTLS(CONFIGURATION.TLSCert, CONFIGURATION.TLSKey).Error())
+		os.Exit(1)
 	} else {
-		log.Fatal(s.ListenAndServe())
+		slog.Error(s.ListenAndServe().Error())
+		os.Exit(1)
 	}
 }
 
@@ -167,30 +176,30 @@ func readConfig(file string) error {
 
 func serveFrontPage(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	_, err := w.Write(FRONTPAGE)
 	if err != nil {
-		log.Println(err.Error())
+		slog.Error(err.Error())
 	}
 }
 
 func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	sessid := r.Header.Get("pastae-sessid")
@@ -207,7 +216,7 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if err != nil {
 		ec := res.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -215,7 +224,7 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	defer func() {
 		ec := res.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	var resp []PastaeListing
@@ -224,7 +233,7 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		var expireUnix int64
 		err = res.Scan(&elem.ID, &expireUnix, &elem.ContentType)
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 			continue
 		}
 		elem.Expire = expireUnix / (60 * 60 * 24)
@@ -232,25 +241,25 @@ func pasteList(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 	bytes, err := json.Marshal(resp)
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	_, err = w.Write(bytes)
 	if err != nil {
-		log.Println(err.Error())
+		slog.Error(err.Error())
 	}
 }
 
 func expiry(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	sessid := r.Header.Get("pastae-sessid")
@@ -282,7 +291,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	sessid := r.Header.Get("pastae-sessid")
@@ -354,24 +363,24 @@ func createDBTablesAndIndexes(db *sql.DB) error {
 
 func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if r == nil {
-		log.Println("http.Request is nil")
+		slog.Error("http.Request is nil")
 		return
 	}
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	hash, err := io.ReadAll(io.LimitReader(r.Body, 100))
 	defer func() {
 		ec := r.Body.Close()
 		if ec != nil {
-			log.Println(ec.Error())
+			slog.Error(ec.Error())
 		}
 	}()
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -379,7 +388,7 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	if err == nil {
 		_, err = w.Write([]byte("OK"))
 		if err != nil {
-			log.Println(err.Error())
+			slog.Error(err.Error())
 		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
