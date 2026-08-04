@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"container/list"
 	"database/sql"
 	"log/slog"
@@ -61,7 +62,7 @@ func TestLRUCache(t *testing.T) {
 	if error != nil {
 		t.Errorf("fetchPaste failed")
 	}
-	if string(fetched) != string(paste) {
+	if !bytes.Equal(fetched, paste) {
 		t.Errorf("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
@@ -78,10 +79,9 @@ func TestInsertPaste(t *testing.T) {
 	PASTAELIST = list.New()
 	paste := []byte("Trololoo")
 	contentType := "wolo/daaddaaaa"
-	var err error
-	KEK, err = generateRandomBytes(16)
+	_, err := generateRandomBytes(16)
 	if err != nil {
-		return
+		t.Error(err)
 	}
 	id, err := insertPaste(paste, false, contentType)
 	if err != nil {
@@ -95,20 +95,20 @@ func TestInsertPaste(t *testing.T) {
 	if error != nil {
 		t.Error("fetchPaste failed")
 	}
-	if string(fetched) != string(paste) {
+	if !bytes.Equal(fetched, paste) {
 		t.Error("Fetched paste is corrupted")
 	}
 	fetched, error = fetchPaste(data)
 	if error != nil {
 		t.Error("fetchPaste failed")
 	}
-	if string(fetched) != string(paste) {
+	if !bytes.Equal(fetched, paste) {
 		t.Error("Fetched paste is corrupted")
 	}
 }
 
 func TestInsertPastaes(t *testing.T) {
-	for i := 0; i < 5000; i++ {
+	for range 5000 {
 		TestInsertPaste(t)
 		TestInsertPasteBurnAfterReading(t)
 	}
@@ -119,10 +119,9 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	PASTAELIST = list.New()
 	paste := []byte("Wololo")
 	contentType := "trolo/daadda"
-	var err error
-	KEK, err = generateRandomBytes(16)
+	_, err := generateRandomBytes(16)
 	if err != nil {
-		return
+		t.Error(err)
 	}
 	id, err := insertPaste(paste, true, contentType)
 	if err != nil {
@@ -136,7 +135,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 	if error != nil {
 		t.Error("fetchPaste failed")
 	}
-	if string(fetched) != string(paste) {
+	if !bytes.Equal(fetched, paste) {
 		t.Error("Fetched paste is corrupted")
 	}
 	_, ok = PASTAEMAP[id]
@@ -146,7 +145,7 @@ func TestInsertPasteBurnAfterReading(t *testing.T) {
 }
 
 func TestInsertPastaesBurnAfterReading(t *testing.T) {
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		TestInsertPasteBurnAfterReading(t)
 		TestInsertPaste(t)
 	}
