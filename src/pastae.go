@@ -134,7 +134,7 @@ func main() {
 		mux.POST("/session/ping", pingHandler)
 		mux.DELETE("/:id", deleteHandler)
 	}
-	tlsConfig := &tls.Config{PreferServerCipherSuites: true, MinVersion: tls.VersionTLS12}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
 	s := &http.Server{
 		Addr:           CONFIGURATION.Listen,
 		Handler:        mux,
